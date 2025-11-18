@@ -12,7 +12,7 @@ public:
 	~CommunicationsSystem();
 private:
     void HandleCommunications();
-    void messageAircraft(const Message& msg);
+    void messageAircraft(const Message_inter_process& msg);  // Changed from Message to Message_inter_process
     std::thread Communications_System;
 };
 
