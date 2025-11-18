@@ -51,8 +51,8 @@ void Aircraft::printInitialAircraftData() const {
 
 void Aircraft::changeHeading(double Vx, double Vy, double Vz){
 	if (Vx > 0) speedX = Vx;
-	if (Vx > 0) speedY = Vy;
-	if (Vx > 0) speedZ = Vz;
+	if (Vy > 0) speedY = Vy;
+	if (Vz > 0) speedZ = Vz;
 }
 
 
@@ -144,15 +144,58 @@ int Aircraft::updatePosition() {
             	// Message is of type Message_inter_process
             	Message_inter_process* receivedMsg = reinterpret_cast<Message_inter_process*>(buffer);
 
-            	// Handle different message types using switch
-                // COEN320 Lab 4_5: You need to handle different message types here
-                // These commands come from Communication System
-                /*
+            	// COEN320 Lab 4_5: Handle different message types from Communications System
                 switch (receivedMsg->type) {
-                    case MessageType::REQUEST_CHANGE_OF_HEADING:
-                    case MessageType::REQUEST_CHANGE_POSITION:
-                    ....
-                */
+                    case MessageType::REQUEST_CHANGE_OF_HEADING: {
+                        msg_change_heading* heading_data = reinterpret_cast<msg_change_heading*>(receivedMsg->data.data());
+                        std::cout << "Aircraft " << id << " received heading change command\n";
+                        std::cout << "  New velocities: VX=" << heading_data->VelocityX 
+                                  << " VY=" << heading_data->VelocityY 
+                                  << " VZ=" << heading_data->VelocityZ << "\n";
+                        
+                        // Apply the heading change
+                        changeHeading(heading_data->VelocityX, heading_data->VelocityY, heading_data->VelocityZ);
+                        
+                        // Reply to acknowledge
+                        MsgReply(rcvid, 0, NULL, 0);
+                        break;
+                    }
+                    
+                    case MessageType::REQUEST_CHANGE_POSITION: {
+                        msg_change_position* pos_data = reinterpret_cast<msg_change_position*>(receivedMsg->data.data());
+                        std::cout << "Aircraft " << id << " received position change command\n";
+                        std::cout << "  New position: X=" << pos_data->x 
+                                  << " Y=" << pos_data->y 
+                                  << " Z=" << pos_data->z << "\n";
+                        
+                        // Apply the position change
+                        posX = pos_data->x;
+                        posY = pos_data->y;
+                        posZ = pos_data->z;
+                        
+                        // Reply to acknowledge
+                        MsgReply(rcvid, 0, NULL, 0);
+                        break;
+                    }
+                    
+                    case MessageType::REQUEST_CHANGE_ALTITUDE: {
+                        msg_change_heading* altitude_data = reinterpret_cast<msg_change_heading*>(receivedMsg->data.data());
+                        std::cout << "Aircraft " << id << " received altitude change command\n";
+                        std::cout << "  New altitude: Z=" << altitude_data->altitude << "\n";
+                        
+                        // Apply the altitude change
+                        posZ = altitude_data->altitude;
+                        
+                        // Reply to acknowledge
+                        MsgReply(rcvid, 0, NULL, 0);
+                        break;
+                    }
+                    
+                    default:
+                        std::cerr << "Aircraft " << id << " received unknown message type\n";
+                        MsgReply(rcvid, -1, NULL, 0);
+                        break;
+                }
             } else {  //periodic
             	// Message is of type Message
             	Message* receivedMsg = reinterpret_cast<Message*>(buffer);
