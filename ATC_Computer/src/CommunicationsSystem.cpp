@@ -40,7 +40,8 @@ void CommunicationsSystem::HandleCommunications() {
     std::cout << "Communications System listening on channel: " << COMMS_CHANNEL_NAME << "\n";
 
     while (true) {
-        Message msg;
+        // Receive Message_inter_process (not Message)
+        Message_inter_process msg;
         int rcvid = MsgReceive(comms_channel->chid, &msg, sizeof(msg), NULL);
 
         if (rcvid == -1) {
@@ -51,7 +52,7 @@ void CommunicationsSystem::HandleCommunications() {
         int reply = 0;
         MsgReply(rcvid, 0, &reply, sizeof(reply));
 
-        // Process the message and forward to aircraft
+        // Process the message based on type
         std::cout << "Communications System received message for Plane " << msg.planeID << "\n";
 
         switch (msg.type) {
@@ -84,7 +85,7 @@ void CommunicationsSystem::HandleCommunications() {
     name_detach(comms_channel, 0);
 }
 
-void CommunicationsSystem::messageAircraft(const Message& msg) {
+void CommunicationsSystem::messageAircraft(const Message_inter_process& msg) {
     // Open channel to the specific aircraft
     std::string plane_channel_name = "AH_40247851_40228573_" + std::to_string(msg.planeID);
     int plane_channel = name_open(plane_channel_name.c_str(), 0);
@@ -94,7 +95,7 @@ void CommunicationsSystem::messageAircraft(const Message& msg) {
         return;
     }
 
-    // Send the message to the aircraft
+    // Send the Message_inter_process directly to the aircraft
     int reply;
     if (MsgSend(plane_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
         std::cerr << "Failed to send message to Plane " << msg.planeID << "\n";
@@ -104,6 +105,3 @@ void CommunicationsSystem::messageAircraft(const Message& msg) {
 
     name_close(plane_channel);
 }
-
-
-
