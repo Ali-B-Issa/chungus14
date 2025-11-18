@@ -69,13 +69,16 @@ void OperatorConsole::HandleConsoleInputs() {
                     continue;
                 }
 
-                // Create message for heading change
+                // Create and INITIALIZE message for heading change
                 Message_inter_process msg;
+                memset(&msg, 0, sizeof(msg));  // Zero out entire structure
+                
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_OF_HEADING;
                 msg.planeID = planeID;
 
                 msg_change_heading heading_data;
+                memset(&heading_data, 0, sizeof(heading_data));  // Zero out data structure
                 heading_data.ID = planeID;
                 heading_data.VelocityX = velX;
                 heading_data.VelocityY = velY;
@@ -110,13 +113,16 @@ void OperatorConsole::HandleConsoleInputs() {
                     continue;
                 }
 
-                // Create message for position change
+                // Create and INITIALIZE message for position change
                 Message_inter_process msg;
+                memset(&msg, 0, sizeof(msg));  // Zero out entire structure
+                
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_POSITION;
                 msg.planeID = planeID;
 
                 msg_change_position pos_data;
+                memset(&pos_data, 0, sizeof(pos_data));  // Zero out data structure
                 pos_data.x = x;
                 pos_data.y = y;
                 pos_data.z = z;
@@ -149,13 +155,16 @@ void OperatorConsole::HandleConsoleInputs() {
                     continue;
                 }
 
-                // Create message for altitude change
+                // Create and INITIALIZE message for altitude change
                 Message_inter_process msg;
+                memset(&msg, 0, sizeof(msg));  // Zero out entire structure
+                
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_ALTITUDE;
                 msg.planeID = planeID;
 
                 msg_change_heading altitude_data;
+                memset(&altitude_data, 0, sizeof(altitude_data));  // Zero out data structure
                 altitude_data.ID = planeID;
                 altitude_data.altitude = z;
                 altitude_data.VelocityX = 0;
