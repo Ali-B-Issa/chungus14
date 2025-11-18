@@ -51,10 +51,12 @@ void CommunicationsSystem::HandleCommunications() {
             continue;  // Error receiving message
         }
 
-        // Verify this is an inter-process message
+        // Check if this is an inter-process message
         if (!msg.header) {
-            std::cerr << "Warning: Received non-inter-process message\n";
-            MsgReply(rcvid, -1, NULL, 0);
+            // This is NOT an inter-process message
+            // This is expected - could be a pulse or other system message
+            // Just reply and continue silently
+            MsgReply(rcvid, 0, NULL, 0);
             continue;
         }
 
@@ -107,7 +109,7 @@ void CommunicationsSystem::messageAircraft(const Message_inter_process& msg) {
     if (plane_channel == -1) {
         std::cerr << "Failed to open channel to Plane " << msg.planeID << " (" << plane_channel_name << ")\n";
         std::cerr << "  Error: " << strerror(errno) << "\n";
-        std::cerr << "  Plane may not be in airspace or channel doesn't exist\n";
+        std::cerr << "  Plane may have left airspace or channel doesn't exist yet\n";
         return;
     }
 
