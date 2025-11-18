@@ -42,19 +42,33 @@ void CommunicationsSystem::HandleCommunications() {
     while (true) {
         // Receive Message_inter_process (not Message)
         Message_inter_process msg;
+        memset(&msg, 0, sizeof(msg));  // Clear the buffer before receiving
+        
         int rcvid = MsgReceive(comms_channel->chid, &msg, sizeof(msg), NULL);
 
         if (rcvid == -1) {
+            std::cerr << "Error receiving message: " << strerror(errno) << "\n";
             continue;  // Error receiving message
         }
+
+        // Verify this is an inter-process message
+        if (!msg.header) {
+            std::cerr << "Warning: Received non-inter-process message\n";
+            MsgReply(rcvid, -1, NULL, 0);
+            continue;
+        }
+
+        // Debug: Print received message details
+        std::cout << "Communications System received message:\n";
+        std::cout << "  Plane ID: " << msg.planeID << "\n";
+        std::cout << "  Type: " << static_cast<int>(msg.type) << "\n";
+        std::cout << "  Data Size: " << msg.dataSize << "\n";
 
         // Reply to acknowledge receipt
         int reply = 0;
         MsgReply(rcvid, 0, &reply, sizeof(reply));
 
         // Process the message based on type
-        std::cout << "Communications System received message for Plane " << msg.planeID << "\n";
-
         switch (msg.type) {
             case MessageType::REQUEST_CHANGE_OF_HEADING:
                 std::cout << "Forwarding heading change request to Plane " << msg.planeID << "\n";
@@ -77,7 +91,7 @@ void CommunicationsSystem::HandleCommunications() {
                 return;
 
             default:
-                std::cerr << "Unknown message type received\n";
+                std::cerr << "Unknown message type received: " << static_cast<int>(msg.type) << "\n";
                 break;
         }
     }
@@ -91,14 +105,19 @@ void CommunicationsSystem::messageAircraft(const Message_inter_process& msg) {
     int plane_channel = name_open(plane_channel_name.c_str(), 0);
 
     if (plane_channel == -1) {
-        std::cerr << "Failed to open channel to Plane " << msg.planeID << "\n";
+        std::cerr << "Failed to open channel to Plane " << msg.planeID << " (" << plane_channel_name << ")\n";
+        std::cerr << "  Error: " << strerror(errno) << "\n";
+        std::cerr << "  Plane may not be in airspace or channel doesn't exist\n";
         return;
     }
+
+    std::cout << "Successfully opened channel to Plane " << msg.planeID << "\n";
 
     // Send the Message_inter_process directly to the aircraft
     int reply;
     if (MsgSend(plane_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
         std::cerr << "Failed to send message to Plane " << msg.planeID << "\n";
+        std::cerr << "  Error: " << strerror(errno) << "\n";
     } else {
         std::cout << "Successfully sent command to Plane " << msg.planeID << "\n";
     }
