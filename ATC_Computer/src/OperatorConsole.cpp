@@ -1,0 +1,188 @@
+/*
+ * OperatorConsole.cpp
+ *
+ *  Created on: Nov 18, 2025
+ *      Author: a_i49449
+ */
+#include "OperatorConsole.h"
+#include <sstream>
+#include "ATCTimer.h"
+#include <ctime>        // For std::time_t, std::localtime
+#include <iomanip>      // For std::put_time
+#include <cmath>
+#include <sys/dispatch.h>
+#include "Msg_structs.h"
+#include <cstring> // For memcpy
+
+// COEN320 Task 4: Define the computer system channel name
+#define COMPUTER_SYSTEM_CHANNEL "AH_40247851_40228573_ComputerSystem"
+
+OperatorConsole::OperatorConsole() : exit(false) {
+    // Start the console input handling thread
+    Operator_Console = std::thread(&OperatorConsole::HandleConsoleInputs, this);
+}
+
+OperatorConsole::~OperatorConsole() {
+    exit = true;
+    if (Operator_Console.joinable()) {
+        Operator_Console.join();
+    }
+}
+
+void OperatorConsole::HandleConsoleInputs() {
+    std::cout << "\n=== Operator Console Started ===\n";
+    std::cout << "Available commands:\n";
+    std::cout << "  1. heading <planeID> <velX> <velY> <velZ> - Change plane heading\n";
+    std::cout << "  2. position <planeID> <x> <y> <z> - Change plane position\n";
+    std::cout << "  3. altitude <planeID> <z> - Change plane altitude\n";
+    std::cout << "  4. exit - Exit the console\n";
+    std::cout << "================================\n\n";
+
+    while (!exit) {
+        std::cout << "Enter command: ";
+        std::string input;
+        std::getline(std::cin, input);
+
+        if (input.empty()) continue;
+
+        logCommand(input);
+
+        std::istringstream iss(input);
+        std::string command;
+        iss >> command;
+
+        if (command == "exit") {
+            std::cout << "Exiting Operator Console...\n";
+            exit = true;
+            break;
+        }
+        else if (command == "heading") {
+            int planeID;
+            double velX, velY, velZ;
+
+            if (iss >> planeID >> velX >> velY >> velZ) {
+                // Open channel to Computer System
+                int cs_channel = name_open(COMPUTER_SYSTEM_CHANNEL, 0);
+
+                if (cs_channel == -1) {
+                    std::cerr << "Failed to open channel to Computer System\n";
+                    continue;
+                }
+
+                // Create message for heading change
+                Message_inter_process msg;
+                msg.header = true;  // Inter-process
+                msg.type = MessageType::REQUEST_CHANGE_OF_HEADING;
+                msg.planeID = planeID;
+
+                msg_change_heading heading_data;
+                heading_data.ID = planeID;
+                heading_data.VelocityX = velX;
+                heading_data.VelocityY = velY;
+                heading_data.VelocityZ = velZ;
+                heading_data.altitude = 0;
+
+                msg.dataSize = sizeof(msg_change_heading);
+                std::memcpy(msg.data.data(), &heading_data, sizeof(msg_change_heading));
+
+                int reply;
+                if (MsgSend(cs_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
+                    std::cerr << "Failed to send message to Computer System\n";
+                } else {
+                    std::cout << "Heading change command sent for Plane " << planeID << "\n";
+                }
+
+                name_close(cs_channel);
+            } else {
+                std::cerr << "Invalid heading command format\n";
+            }
+        }
+        else if (command == "position") {
+            int planeID;
+            double x, y, z;
+
+            if (iss >> planeID >> x >> y >> z) {
+                // Open channel to Computer System
+                int cs_channel = name_open(COMPUTER_SYSTEM_CHANNEL, 0);
+
+                if (cs_channel == -1) {
+                    std::cerr << "Failed to open channel to Computer System\n";
+                    continue;
+                }
+
+                // Create message for position change
+                Message_inter_process msg;
+                msg.header = true;  // Inter-process
+                msg.type = MessageType::REQUEST_CHANGE_POSITION;
+                msg.planeID = planeID;
+
+                msg_change_position pos_data;
+                pos_data.x = x;
+                pos_data.y = y;
+                pos_data.z = z;
+
+                msg.dataSize = sizeof(msg_change_position);
+                std::memcpy(msg.data.data(), &pos_data, sizeof(msg_change_position));
+
+                int reply;
+                if (MsgSend(cs_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
+                    std::cerr << "Failed to send message to Computer System\n";
+                } else {
+                    std::cout << "Position change command sent for Plane " << planeID << "\n";
+                }
+
+                name_close(cs_channel);
+            } else {
+                std::cerr << "Invalid position command format\n";
+            }
+        }
+        else if (command == "altitude") {
+            int planeID;
+            double z;
+
+            if (iss >> planeID >> z) {
+                // Open channel to Computer System
+                int cs_channel = name_open(COMPUTER_SYSTEM_CHANNEL, 0);
+
+                if (cs_channel == -1) {
+                    std::cerr << "Failed to open channel to Computer System\n";
+                    continue;
+                }
+
+                // Create message for altitude change
+                Message_inter_process msg;
+                msg.header = true;  // Inter-process
+                msg.type = MessageType::REQUEST_CHANGE_ALTITUDE;
+                msg.planeID = planeID;
+
+                msg_change_heading altitude_data;
+                altitude_data.ID = planeID;
+                altitude_data.altitude = z;
+                altitude_data.VelocityX = 0;
+                altitude_data.VelocityY = 0;
+                altitude_data.VelocityZ = 0;
+
+                msg.dataSize = sizeof(msg_change_heading);
+                std::memcpy(msg.data.data(), &altitude_data, sizeof(msg_change_heading));
+
+                int reply;
+                if (MsgSend(cs_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
+                    std::cerr << "Failed to send message to Computer System\n";
+                } else {
+                    std::cout << "Altitude change command sent for Plane " << planeID << "\n";
+                }
+
+                name_close(cs_channel);
+            } else {
+                std::cerr << "Invalid altitude command format\n";
+            }
+        }
+        else {
+            std::cerr << "Unknown command: " << command << "\n";
+        }
+    }
+}
+
+void OperatorConsole::logCommand(const std::string& command) {
+    std::cout << "[LOG] Command received: " << command << std::endl;
+}

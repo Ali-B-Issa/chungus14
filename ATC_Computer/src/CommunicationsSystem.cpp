@@ -1,0 +1,109 @@
+/*
+ * CommunicationsSystem.cpp
+ *
+ *  Created on: Nov 18, 2025
+ *      Author: a_i49449
+ */
+#include "CommunicationsSystem.h"
+#include "ATCTimer.h"
+#include <ctime>        // For std::time_t, std::localtime
+#include <iomanip>      // For std::put_time
+#include <cmath>
+#include <sys/dispatch.h>
+#include <cstring> // For memcpy
+
+// COEN320 Task 4: Define the communications system channel name
+#define COMMS_CHANNEL_NAME "AH_40247851_40228573_Comms"
+
+CommunicationsSystem::CommunicationsSystem() {
+    // Start the communications handling thread
+    Communications_System = std::thread(&CommunicationsSystem::HandleCommunications, this);
+}
+
+CommunicationsSystem::~CommunicationsSystem() {
+    if (Communications_System.joinable()) {
+        Communications_System.join();
+    }
+}
+
+void CommunicationsSystem::HandleCommunications() {
+    std::cout << "Communications System started\n";
+
+    // Create channel for receiving commands from Operator Console
+    name_attach_t* comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
+
+    if (comms_channel == NULL) {
+        std::cerr << "Failed to create Communications System channel\n";
+        return;
+    }
+
+    std::cout << "Communications System listening on channel: " << COMMS_CHANNEL_NAME << "\n";
+
+    while (true) {
+        Message msg;
+        int rcvid = MsgReceive(comms_channel->chid, &msg, sizeof(msg), NULL);
+
+        if (rcvid == -1) {
+            continue;  // Error receiving message
+        }
+
+        // Reply to acknowledge receipt
+        int reply = 0;
+        MsgReply(rcvid, 0, &reply, sizeof(reply));
+
+        // Process the message and forward to aircraft
+        std::cout << "Communications System received message for Plane " << msg.planeID << "\n";
+
+        switch (msg.type) {
+            case MessageType::REQUEST_CHANGE_OF_HEADING:
+                std::cout << "Forwarding heading change request to Plane " << msg.planeID << "\n";
+                messageAircraft(msg);
+                break;
+
+            case MessageType::REQUEST_CHANGE_POSITION:
+                std::cout << "Forwarding position change request to Plane " << msg.planeID << "\n";
+                messageAircraft(msg);
+                break;
+
+            case MessageType::REQUEST_CHANGE_ALTITUDE:
+                std::cout << "Forwarding altitude change request to Plane " << msg.planeID << "\n";
+                messageAircraft(msg);
+                break;
+
+            case MessageType::EXIT:
+                std::cout << "Exit command received\n";
+                name_detach(comms_channel, 0);
+                return;
+
+            default:
+                std::cerr << "Unknown message type received\n";
+                break;
+        }
+    }
+
+    name_detach(comms_channel, 0);
+}
+
+void CommunicationsSystem::messageAircraft(const Message& msg) {
+    // Open channel to the specific aircraft
+    std::string plane_channel_name = "AH_40247851_40228573_" + std::to_string(msg.planeID);
+    int plane_channel = name_open(plane_channel_name.c_str(), 0);
+
+    if (plane_channel == -1) {
+        std::cerr << "Failed to open channel to Plane " << msg.planeID << "\n";
+        return;
+    }
+
+    // Send the message to the aircraft
+    int reply;
+    if (MsgSend(plane_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
+        std::cerr << "Failed to send message to Plane " << msg.planeID << "\n";
+    } else {
+        std::cout << "Successfully sent command to Plane " << msg.planeID << "\n";
+    }
+
+    name_close(plane_channel);
+}
+
+
+
