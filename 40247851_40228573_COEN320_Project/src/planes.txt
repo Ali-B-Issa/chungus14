@@ -1,6 +1,22 @@
-0 1 95750 59850 29950 250 150 50 
-5 2 75000 45000 35000 500 100 -75
-3 3 95750 59850 29950 250 150 50
-8 4 75000 45000 35000 500 100 -75
-5 5 95750 59850 29950 250 150 50
-10 6 75000 45000 35000 500 100 -75
+# planes.txt - Better test configuration
+# Format: arrivalTime id posX posY posZ speedX speedY speedZ
+#
+# Airspace boundaries:
+# X: 0 to 100000
+# Y: 0 to 100000
+# Z: 15000 to 40000
+#
+# These planes start in the middle and move slowly
+# giving you ~60+ seconds to send commands
+
+# Plane 1 - Starts at arrival, moves slowly east
+0 1 20000 50000 25000 100 50 20
+
+# Plane 2 - Arrives at 5 seconds, moves slowly northeast  
+5 2 20000 30000 27000 120 80 -10
+
+# Plane 3 - Arrives at 10 seconds, moves slowly southeast
+10 3 30000 50000 30000 80 -60 15
+
+# Plane 4 - Arrives at 15 seconds, for collision testing
+15 4 20000 50000 25100 100 50 20
