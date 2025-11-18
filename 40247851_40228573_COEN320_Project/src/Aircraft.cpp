@@ -50,9 +50,12 @@ void Aircraft::printInitialAircraftData() const {
 
 
 void Aircraft::changeHeading(double Vx, double Vy, double Vz){
-	if (Vx > 0) speedX = Vx;
-	if (Vy > 0) speedY = Vy;
-	if (Vz > 0) speedZ = Vz;
+	// FIXED: Original code had bugs checking Vx three times
+	if (Vx != 0) speedX = Vx;
+	if (Vy != 0) speedY = Vy;
+	if (Vz != 0) speedZ = Vz;
+	std::cout << "Aircraft " << id << " heading changed to: VX=" << speedX 
+	          << " VY=" << speedY << " VZ=" << speedZ << "\n";
 }
 
 
@@ -109,6 +112,8 @@ int Aircraft::updatePosition() {
         return EXIT_FAILURE;
     }
 
+    std::cout << "Aircraft " << id << " channel created and listening\n";
+
     // Start the position update loop
     while (true) {
         // Update position based on velocity
@@ -124,6 +129,7 @@ int Aircraft::updatePosition() {
             posY < airspace.lower_y_boundary || posY > airspace.upper_y_boundary ||
             posZ < airspace.lower_z_boundary || posZ > airspace.upper_z_boundary) {
             // Send exit airspace message and exit loop if out of bounds
+            std::cout << "Aircraft " << id << " exiting airspace\n";
             Message exitAirspaceMessage = createExitAirspaceMessage(id);
             if (MsgSend(Radar_id, &exitAirspaceMessage, sizeof(exitAirspaceMessage), 0, 0) == -1) {
                 std::cout << "Failed to send exit message to Radar!\n";
@@ -143,6 +149,10 @@ int Aircraft::updatePosition() {
             if (isInterProcess){  //sporadic
             	// Message is of type Message_inter_process
             	Message_inter_process* receivedMsg = reinterpret_cast<Message_inter_process*>(buffer);
+
+            	// Debug output
+            	std::cout << "Aircraft " << id << " received inter-process message, type: " 
+            	          << static_cast<int>(receivedMsg->type) << "\n";
 
             	// COEN320 Lab 4_5: Handle different message types from Communications System
                 switch (receivedMsg->type) {
@@ -173,6 +183,8 @@ int Aircraft::updatePosition() {
                         posY = pos_data->y;
                         posZ = pos_data->z;
                         
+                        std::cout << "Aircraft " << id << " position updated\n";
+                        
                         // Reply to acknowledge
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
@@ -186,13 +198,16 @@ int Aircraft::updatePosition() {
                         // Apply the altitude change
                         posZ = altitude_data->altitude;
                         
+                        std::cout << "Aircraft " << id << " altitude updated to " << posZ << "\n";
+                        
                         // Reply to acknowledge
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
                     }
                     
                     default:
-                        std::cerr << "Aircraft " << id << " received unknown message type\n";
+                        std::cerr << "Aircraft " << id << " received unknown inter-process message type: " 
+                                  << static_cast<int>(receivedMsg->type) << "\n";
                         MsgReply(rcvid, -1, NULL, 0);
                         break;
                 }
