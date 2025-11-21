@@ -50,7 +50,7 @@ bool ComputerSystem::initializeSharedMemory() {
 			continue;
 		}
 
-		std::cout << "Shared memory initialized successfully." << std::endl;
+		//std::cout << "Shared memory initialized successfully." << std::endl;
 		return true;
 
 	}
@@ -68,7 +68,7 @@ void ComputerSystem::cleanupSharedMemory() {
 bool ComputerSystem::startMonitoring() {
     if (initializeSharedMemory()) {
         running = true; // will be used in monitorAirspace
-        std::cout << "Starting monitoring thread." << std::endl;
+        //std::cout << "Starting monitoring thread." << std::endl;
         monitorThread = std::thread(&ComputerSystem::monitorAirspace, this);
         return true;
     } else {

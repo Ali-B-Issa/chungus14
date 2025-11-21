@@ -1,9 +1,3 @@
-/*
- * OperatorConsole.cpp
- *
- *  Created on: Nov 18, 2025
- *      Author: a_i49449
- */
 #include "OperatorConsole.h"
 #include <sstream>
 #include "ATCTimer.h"
@@ -75,7 +69,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 // Create and INITIALIZE message for heading change
                 Message_inter_process msg;
                 memset(&msg, 0, sizeof(msg));  // Zero out entire structure
-                
+
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_OF_HEADING;
                 msg.planeID = planeID;
@@ -100,7 +94,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 }
 
                 name_close(comms_channel);
-                
+
                 // Small delay to allow system to process
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
@@ -124,7 +118,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 // Create and INITIALIZE message for position change
                 Message_inter_process msg;
                 memset(&msg, 0, sizeof(msg));  // Zero out entire structure
-                
+
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_POSITION;
                 msg.planeID = planeID;
@@ -147,7 +141,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 }
 
                 name_close(comms_channel);
-                
+
                 // Small delay to allow system to process
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
@@ -171,7 +165,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 // Create and INITIALIZE message for altitude change
                 Message_inter_process msg;
                 memset(&msg, 0, sizeof(msg));  // Zero out entire structure
-                
+
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_ALTITUDE;
                 msg.planeID = planeID;
@@ -196,7 +190,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 }
 
                 name_close(comms_channel);
-                
+
                 // Small delay to allow system to process
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
