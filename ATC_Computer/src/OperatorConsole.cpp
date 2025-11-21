@@ -13,6 +13,8 @@
 #include <sys/dispatch.h>
 #include "Msg_structs.h"
 #include <cstring> // For memcpy
+#include <chrono>
+#include <thread>
 
 // COEN320 Task 4: Send to Communications System, not Computer System
 #define COMMS_CHANNEL_NAME "AH_40247851_40228573_Comms"
@@ -66,6 +68,7 @@ void OperatorConsole::HandleConsoleInputs() {
 
                 if (comms_channel == -1) {
                     std::cerr << "Failed to open channel to Communications System\n";
+                    std::cerr << "  Error: " << strerror(errno) << "\n";
                     continue;
                 }
 
@@ -91,11 +94,15 @@ void OperatorConsole::HandleConsoleInputs() {
                 int reply;
                 if (MsgSend(comms_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
                     std::cerr << "Failed to send message to Communications System\n";
+                    std::cerr << "  Error: " << strerror(errno) << "\n";
                 } else {
                     std::cout << "Heading change command sent for Plane " << planeID << "\n";
                 }
 
                 name_close(comms_channel);
+                
+                // Small delay to allow system to process
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 std::cerr << "Invalid heading command format. Usage: heading <planeID> <velX> <velY> <velZ>\n";
             }
@@ -110,6 +117,7 @@ void OperatorConsole::HandleConsoleInputs() {
 
                 if (comms_channel == -1) {
                     std::cerr << "Failed to open channel to Communications System\n";
+                    std::cerr << "  Error: " << strerror(errno) << "\n";
                     continue;
                 }
 
@@ -133,11 +141,15 @@ void OperatorConsole::HandleConsoleInputs() {
                 int reply;
                 if (MsgSend(comms_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
                     std::cerr << "Failed to send message to Communications System\n";
+                    std::cerr << "  Error: " << strerror(errno) << "\n";
                 } else {
                     std::cout << "Position change command sent for Plane " << planeID << "\n";
                 }
 
                 name_close(comms_channel);
+                
+                // Small delay to allow system to process
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 std::cerr << "Invalid position command format. Usage: position <planeID> <x> <y> <z>\n";
             }
@@ -152,6 +164,7 @@ void OperatorConsole::HandleConsoleInputs() {
 
                 if (comms_channel == -1) {
                     std::cerr << "Failed to open channel to Communications System\n";
+                    std::cerr << "  Error: " << strerror(errno) << "\n";
                     continue;
                 }
 
@@ -177,11 +190,15 @@ void OperatorConsole::HandleConsoleInputs() {
                 int reply;
                 if (MsgSend(comms_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
                     std::cerr << "Failed to send message to Communications System\n";
+                    std::cerr << "  Error: " << strerror(errno) << "\n";
                 } else {
                     std::cout << "Altitude change command sent for Plane " << planeID << "\n";
                 }
 
                 name_close(comms_channel);
+                
+                // Small delay to allow system to process
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 std::cerr << "Invalid altitude command format. Usage: altitude <planeID> <z>\n";
             }
