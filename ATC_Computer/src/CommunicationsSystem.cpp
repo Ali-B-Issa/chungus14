@@ -51,11 +51,16 @@ void CommunicationsSystem::HandleCommunications() {
             continue;  // Error receiving message
         }
 
+        // Skip pulses (rcvid == 0)
+        if (rcvid == 0) {
+            // This is a pulse, not a message - just continue silently
+            continue;
+        }
+
         // Check if this is an inter-process message
         if (!msg.header) {
             // This is NOT an inter-process message
-            // This is expected - could be a pulse or other system message
-            // Just reply and continue silently
+            // Reply and continue silently - this can happen with system messages
             MsgReply(rcvid, 0, NULL, 0);
             continue;
         }
@@ -66,7 +71,8 @@ void CommunicationsSystem::HandleCommunications() {
         std::cout << "  Type: " << static_cast<int>(msg.type) << "\n";
         std::cout << "  Data Size: " << msg.dataSize << "\n";
 
-        // Reply to acknowledge receipt
+        // Reply to acknowledge receipt BEFORE forwarding
+        // This allows the Operator Console to continue immediately
         int reply = 0;
         MsgReply(rcvid, 0, &reply, sizeof(reply));
 
