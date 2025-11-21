@@ -143,10 +143,16 @@ int Aircraft::updatePosition() {
         int rcvid = MsgReceive(Plane_channel->chid, buffer, sizeof(buffer), NULL);
 
         if (rcvid != -1) {
-
-        	bool isInterProcess = buffer[0] & 0x01;
+            // Determine message type by checking the MessageType field
+            // Cast to base Message to peek at the type
+            Message* baseMsg = reinterpret_cast<Message*>(buffer);
+            
+            // Check if it's a REQUEST_POSITION (from Radar, periodic) or something else (from Comms, sporadic)
+            // REQUEST_POSITION is always from Radar and should be treated as intra-process
+            bool isInterProcess = (baseMsg->type != MessageType::REQUEST_POSITION);
+            
             // Radar requested position data
-            if (isInterProcess){  //sporadic
+            if (isInterProcess){  //sporadic - from Communications System
             	// Message is of type Message_inter_process
             	Message_inter_process* receivedMsg = reinterpret_cast<Message_inter_process*>(buffer);
 
@@ -211,7 +217,7 @@ int Aircraft::updatePosition() {
                         MsgReply(rcvid, -1, NULL, 0);
                         break;
                 }
-            } else {  //periodic
+            } else {  //periodic - from Radar
             	// Message is of type Message
             	Message* receivedMsg = reinterpret_cast<Message*>(buffer);
 
