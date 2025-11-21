@@ -3,6 +3,9 @@
  * 
  * Display System for ATC Project
  * Group: AH_40247851_40228573
+ * 
+ * Shows aircraft on a 2D grid based on X,Y positions
+ * Collision warnings shown as !ID!
  */
 
 #include "Display.h"
@@ -10,6 +13,17 @@
 #include <iomanip>
 #include <sstream>
 #include <cstring>
+#include <cmath>
+
+// Grid dimensions (characters)
+const int GRID_WIDTH = 60;
+const int GRID_HEIGHT = 30;
+
+// Airspace boundaries (feet)
+const double AIRSPACE_MIN_X = 0;
+const double AIRSPACE_MAX_X = 100000;
+const double AIRSPACE_MIN_Y = 0;
+const double AIRSPACE_MAX_Y = 100000;
 
 Display::Display() : shm_fd(-1), shared_mem(nullptr), display_channel(nullptr), running(false) {}
 
@@ -32,7 +46,6 @@ bool Display::initialize() {
 }
 
 bool Display::initializeSharedMemory() {
-    // Keep trying until shared memory is available
     while (true) {
         shm_fd = shm_open(SHARED_MEMORY_NAME, O_RDONLY, 0666);
         if (shm_fd == -1) {
@@ -102,13 +115,9 @@ void Display::shutdown() {
 }
 
 void Display::run() {
-    // Start the display thread
     displayThread = std::thread(&Display::displayAircraft, this);
-    
-    // Start the collision listener thread
     collisionListenerThread = std::thread(&Display::listenForCollisions, this);
     
-    // Wait for threads to complete
     if (displayThread.joinable()) {
         displayThread.join();
     }
@@ -124,41 +133,33 @@ void Display::listenForCollisions() {
         Message_inter_process msg;
         memset(&msg, 0, sizeof(msg));
         
-        // Set up timeout for non-blocking receive
         struct sigevent event;
         SIGEV_UNBLOCK_INIT(&event);
-        uint64_t timeout = 500000000ULL; // 500ms in nanoseconds
+        uint64_t timeout = 500000000ULL;
         TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &event, &timeout, NULL);
         
         int rcvid = MsgReceive(display_channel->chid, &msg, sizeof(msg), NULL);
         
-        if (rcvid == -1) {
-            // Timeout or error - continue loop
-            continue;
-        }
+        if (rcvid == -1) continue;
+        if (rcvid == 0) continue;
         
-        if (rcvid == 0) {
-            // This is a pulse, not a message
-            continue;
-        }
-        
-        // Reply immediately to unblock sender
         int reply = 0;
         MsgReply(rcvid, 0, &reply, sizeof(reply));
         
-        // Process collision message
         if (msg.type == MessageType::COLLISION_DETECTED) {
             size_t numPairs = msg.dataSize / sizeof(std::pair<int, int>);
             std::pair<int, int>* pairs = reinterpret_cast<std::pair<int, int>*>(msg.data.data());
             
-            // Lock and update collision set
             std::lock_guard<std::mutex> lock(collisionMutex);
             planesInCollision.clear();
             
             for (size_t i = 0; i < numPairs; i++) {
-                printCollisionWarning(pairs[i].first, pairs[i].second);
                 planesInCollision.insert(pairs[i].first);
                 planesInCollision.insert(pairs[i].second);
+                
+                // Print collision warning
+                std::cout << "\n*** COLLISION WARNING: Aircraft " << pairs[i].first 
+                          << " and " << pairs[i].second << " ***\n\n";
             }
         }
     }
@@ -167,27 +168,22 @@ void Display::listenForCollisions() {
 }
 
 void Display::displayAircraft() {
-    ATCTimer timer(1, 0); // 1 second interval
+    ATCTimer timer(1, 0);
     std::cout << "Display: Aircraft display thread started\n";
     
-    // Wait for planes to enter airspace
     while (running && shared_mem->is_empty.load()) {
         std::cout << "Display: Waiting for aircraft to enter airspace...\n";
         timer.waitTimer();
     }
     
     while (running) {
-        // Check if airspace is now empty
         if (shared_mem->is_empty.load()) {
-            std::cout << "\n";
-            std::cout << "╔════════════════════════════════════════════════════════════╗\n";
-            std::cout << "║     AIRSPACE EMPTY - ALL AIRCRAFT HAVE DEPARTED            ║\n";
-            std::cout << "╚════════════════════════════════════════════════════════════╝\n";
+            clearScreen();
+            std::cout << "\n=== AIRSPACE EMPTY - ALL AIRCRAFT HAVE DEPARTED ===\n";
             running = false;
             break;
         }
         
-        // Read plane data from shared memory
         std::vector<msg_plane_info> planes;
         int count = shared_mem->count;
         
@@ -195,10 +191,8 @@ void Display::displayAircraft() {
             planes.push_back(shared_mem->plane_data[i]);
         }
         
-        // Display the airspace grid
+        clearScreen();
         printAirspaceGrid(planes);
-        
-        // Wait for next update
         timer.waitTimer();
     }
     
@@ -206,51 +200,140 @@ void Display::displayAircraft() {
 }
 
 void Display::clearScreen() {
-    // ANSI escape sequence to clear screen and move cursor to top-left
     std::cout << "\033[2J\033[H";
 }
 
 void Display::printCollisionWarning(int planeA, int planeB) {
-    std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║                                                                  ║\n";
-    std::cout << "║   *** COLLISION WARNING: Aircraft " << std::setw(2) << planeA 
-              << " and " << std::setw(2) << planeB << " ***              ║\n";
-    std::cout << "║                                                                  ║\n";
-    std::cout << "╚══════════════════════════════════════════════════════════════════╝\n";
-    std::cout << "\n";
+    std::cout << "*** COLLISION WARNING: Aircraft " << planeA << " and " << planeB << " ***\n";
+}
+
+// Convert airspace X coordinate to grid column
+int Display::airspaceToGridX(double x) {
+    double normalized = (x - AIRSPACE_MIN_X) / (AIRSPACE_MAX_X - AIRSPACE_MIN_X);
+    int gridX = static_cast<int>(normalized * (GRID_WIDTH - 1));
+    return std::max(0, std::min(GRID_WIDTH - 1, gridX));
+}
+
+// Convert airspace Y coordinate to grid row (inverted so Y increases upward)
+int Display::airspaceToGridY(double y) {
+    double normalized = (y - AIRSPACE_MIN_Y) / (AIRSPACE_MAX_Y - AIRSPACE_MIN_Y);
+    int gridY = static_cast<int>((1.0 - normalized) * (GRID_HEIGHT - 1));
+    return std::max(0, std::min(GRID_HEIGHT - 1, gridY));
+}
+
+// Get direction arrow based on velocity
+char Display::getDirectionArrow(double vx, double vy) {
+    if (vx == 0 && vy == 0) return 'o';  // Stationary
+    
+    double angle = atan2(vy, vx) * 180.0 / 3.14159265;
+    
+    if (angle >= -22.5 && angle < 22.5) return '>';       // East
+    if (angle >= 22.5 && angle < 67.5) return '/';        // Northeast (display inverted)
+    if (angle >= 67.5 && angle < 112.5) return '^';       // North
+    if (angle >= 112.5 && angle < 157.5) return '\\';     // Northwest (display inverted)
+    if (angle >= 157.5 || angle < -157.5) return '<';     // West
+    if (angle >= -157.5 && angle < -112.5) return '/';    // Southwest (display inverted)
+    if (angle >= -112.5 && angle < -67.5) return 'v';     // South
+    if (angle >= -67.5 && angle < -22.5) return '\\';     // Southeast (display inverted)
+    
+    return 'o';
 }
 
 void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     std::lock_guard<std::mutex> lock(collisionMutex);
     
-    std::cout << "\n";
-    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║                           AIRSPACE DISPLAY - Timestamp: " 
-              << std::setw(10) << shared_mem->timestamp << "                          ║\n";
-    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════════════════════╣\n";
-    std::cout << "║  ID  │   Position X   │   Position Y   │   Position Z   │  Vel X  │  Vel Y  │  Vel Z  │ STAT ║\n";
-    std::cout << "╠══════╪════════════════╪════════════════╪════════════════╪═════════╪═════════╪═════════╪══════╣\n";
+    // Initialize grid with empty spaces
+    std::vector<std::vector<std::string>> grid(GRID_HEIGHT, std::vector<std::string>(GRID_WIDTH, " "));
     
+    // Place aircraft on grid
     for (const auto& plane : planes) {
-        bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
-        std::string status = inCollision ? " !!" : " OK";
-        std::string prefix = inCollision ? "║ *" : "║  ";
+        int gx = airspaceToGridX(plane.PositionX);
+        int gy = airspaceToGridY(plane.PositionY);
         
-        std::cout << prefix << std::setw(3) << plane.id << " │"
-                  << std::setw(15) << std::fixed << std::setprecision(1) << plane.PositionX << " │"
-                  << std::setw(15) << plane.PositionY << " │"
-                  << std::setw(15) << plane.PositionZ << " │"
-                  << std::setw(8) << std::setprecision(0) << plane.VelocityX << " │"
-                  << std::setw(8) << plane.VelocityY << " │"
-                  << std::setw(8) << plane.VelocityZ << " │"
-                  << std::setw(5) << status << "║\n";
+        bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
+        
+        std::string label;
+        if (inCollision) {
+            label = "!" + std::to_string(plane.id) + "!";
+        } else {
+            char arrow = getDirectionArrow(plane.VelocityX, plane.VelocityY);
+            label = std::string(1, arrow) + std::to_string(plane.id);
+        }
+        
+        grid[gy][gx] = label;
     }
     
-    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════════════════════╣\n";
-    std::cout << "║  Total Aircraft: " << std::setw(3) << planes.size() 
-              << "                                                                              ║\n";
-    std::cout << "║  Airspace Boundaries: X[0-100000] Y[0-100000] Z[15000-40000] feet                             ║\n";
-    std::cout << "║  Legend: * = Aircraft in collision warning | !! = Collision status                           ║\n";
-    std::cout << "╚═══════════════════════════════════════════════════════════════════════════════════════════════╝\n";
+    // Print header
+    std::cout << "╔════════════════════════════════════════════════════════════════════╗\n";
+    std::cout << "║           AIRSPACE GRID DISPLAY - Timestamp: " << std::setw(10) << shared_mem->timestamp << "            ║\n";
+    std::cout << "║           Aircraft: " << std::setw(3) << planes.size() << "    Airspace: 100km x 100km                    ║\n";
+    std::cout << "╠════════════════════════════════════════════════════════════════════╣\n";
+    
+    // Print Y-axis label (top)
+    std::cout << "║ Y=100k                                                              ║\n";
+    
+    // Print top border of grid
+    std::cout << "║  ┌";
+    for (int x = 0; x < GRID_WIDTH; x++) std::cout << "─";
+    std::cout << "┐  ║\n";
+    
+    // Print grid rows
+    for (int y = 0; y < GRID_HEIGHT; y++) {
+        std::cout << "║  │";
+        for (int x = 0; x < GRID_WIDTH; x++) {
+            // Handle multi-character labels
+            if (grid[y][x] != " " && grid[y][x].length() > 1) {
+                std::cout << grid[y][x];
+                // Skip cells that the label overlaps
+                int skip = grid[y][x].length() - 1;
+                x += skip;
+                // Fill remaining space if we went past
+                while (skip > 0 && x < GRID_WIDTH) {
+                    skip--;
+                }
+            } else {
+                std::cout << grid[y][x];
+            }
+        }
+        std::cout << "│  ║\n";
+    }
+    
+    // Print bottom border of grid
+    std::cout << "║  └";
+    for (int x = 0; x < GRID_WIDTH; x++) std::cout << "─";
+    std::cout << "┘  ║\n";
+    
+    // Print Y-axis label (bottom) and X-axis labels
+    std::cout << "║ Y=0   X=0                                                    X=100k ║\n";
+    
+    // Print legend
+    std::cout << "╠════════════════════════════════════════════════════════════════════╣\n";
+    std::cout << "║ Legend: >N = East  <N = West  ^N = North  vN = South  oN = Static  ║\n";
+    std::cout << "║         !N! = COLLISION WARNING                                    ║\n";
+    std::cout << "╠════════════════════════════════════════════════════════════════════╣\n";
+    
+    // Print aircraft details below grid
+    std::cout << "║ Aircraft Details:                                                  ║\n";
+    for (const auto& plane : planes) {
+        bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
+        std::string status = inCollision ? "!COLLISION!" : "OK";
+        
+        std::ostringstream oss;
+        oss << "║  ID:" << std::setw(2) << plane.id 
+            << " Pos(" << std::setw(6) << (int)plane.PositionX << "," 
+            << std::setw(6) << (int)plane.PositionY << "," 
+            << std::setw(6) << (int)plane.PositionZ << ")"
+            << " Vel(" << std::setw(4) << (int)plane.VelocityX << "," 
+            << std::setw(4) << (int)plane.VelocityY << "," 
+            << std::setw(4) << (int)plane.VelocityZ << ")"
+            << " " << std::setw(11) << status;
+        
+        std::string line = oss.str();
+        // Pad to fit box
+        while (line.length() < 68) line += " ";
+        line += "║";
+        std::cout << line << "\n";
+    }
+    
+    std::cout << "╚════════════════════════════════════════════════════════════════════╝\n";
 }
