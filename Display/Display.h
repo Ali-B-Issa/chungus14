@@ -63,6 +63,7 @@ private:
     // Track planes involved in collisions for highlighting
     std::set<int> planesInCollision;
     std::mutex collisionMutex;
+    uint64_t lastCollisionTime;  // Timestamp of last collision message
 
     // Initialization methods
     bool initializeSharedMemory();
