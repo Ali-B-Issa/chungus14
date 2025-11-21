@@ -3,6 +3,8 @@
  * 
  * Display System Header for ATC Project
  * Group: AH_40247851_40228573
+ * 
+ * Shows aircraft on a 2D grid with collision warnings as !ID!
  */
 
 #ifndef DISPLAY_H_
@@ -78,6 +80,11 @@ private:
     void printAirspaceGrid(const std::vector<msg_plane_info>& planes);
     void printCollisionWarning(int planeA, int planeB);
     void clearScreen();
+    
+    // Grid conversion helpers
+    int airspaceToGridX(double x);   // Convert airspace X to grid column
+    int airspaceToGridY(double y);   // Convert airspace Y to grid row
+    char getDirectionArrow(double vx, double vy);  // Get arrow based on velocity
 };
 
 #endif /* DISPLAY_H_ */
