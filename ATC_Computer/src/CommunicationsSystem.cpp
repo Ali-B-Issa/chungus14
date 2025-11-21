@@ -35,17 +35,22 @@ CommunicationsSystem::~CommunicationsSystem() {
 void CommunicationsSystem::HandleCommunications() {
     std::cout << "Communications System started\n";
 
-    // Try to create channel with retries
-    int retries = 5;
-    while (retries > 0 && comms_channel == NULL) {
-        comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
+    // Try to create channel - if it exists, try to clean up first
+    comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
+    
+    if (comms_channel == NULL && errno == EEXIST) {
+        std::cout << "Channel already exists, attempting to clean up...\n";
         
-        if (comms_channel == NULL) {
-            std::cerr << "Failed to create Communications System channel, retrying... (" 
-                      << strerror(errno) << ")\n";
-            sleep(1);
-            retries--;
+        // Try to open and close the existing channel to release it
+        int old_channel = name_open(COMMS_CHANNEL_NAME, 0);
+        if (old_channel != -1) {
+            name_close(old_channel);
         }
+        
+        sleep(1);
+        
+        // Retry
+        comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
     }
     
     if (comms_channel == NULL) {
