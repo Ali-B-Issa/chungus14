@@ -147,9 +147,16 @@ int Aircraft::updatePosition() {
             // Cast to base Message to peek at the type
             Message* baseMsg = reinterpret_cast<Message*>(buffer);
             
-            // Check if it's a REQUEST_POSITION (from Radar, periodic) or something else (from Comms, sporadic)
-            // REQUEST_POSITION is always from Radar and should be treated as intra-process
-            bool isInterProcess = (baseMsg->type != MessageType::REQUEST_POSITION);
+            // First check if this looks like a valid message type
+            MessageType msgType = baseMsg->type;
+            int typeValue = static_cast<int>(msgType);
+            
+            // Valid MessageType enum values are 0-10
+            // If we get garbage data (like 223), it's from Radar which doesn't properly initialize all fields
+            // REQUEST_POSITION (3) is always from Radar
+            // Types 4-10 are from Communications System (operator commands)
+            bool isValidType = (typeValue >= 0 && typeValue <= 10);
+            bool isInterProcess = isValidType && (msgType != MessageType::REQUEST_POSITION);
             
             // Radar requested position data
             if (isInterProcess){  //sporadic - from Communications System
