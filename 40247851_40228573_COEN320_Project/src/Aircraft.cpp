@@ -54,7 +54,7 @@ void Aircraft::changeHeading(double Vx, double Vy, double Vz){
 	if (Vx != 0) speedX = Vx;
 	if (Vy != 0) speedY = Vy;
 	if (Vz != 0) speedZ = Vz;
-	std::cout << "Aircraft " << id << " heading changed to: VX=" << speedX 
+	std::cout << "Aircraft " << id << " heading changed to: VX=" << speedX
 	          << " VY=" << speedY << " VZ=" << speedZ << "\n";
 }
 
@@ -122,8 +122,9 @@ int Aircraft::updatePosition() {
         posZ += speedZ;
 
         // Debug: Print the new position
-        //std::cout << "Updated Position: (" << posX << ", " << posY << ", " << posZ << ")\n";
-
+        if (id == 2){
+        std::cout << "Updated Position: (" << posX << ", " << posY << ", " << posZ << ")\n";
+        }
         // Check if the plane is still within airspace boundaries
         if (posX < airspace.lower_x_boundary || posX > airspace.upper_x_boundary ||
             posY < airspace.lower_y_boundary || posY > airspace.upper_y_boundary ||
@@ -146,25 +147,25 @@ int Aircraft::updatePosition() {
             // Determine message type by checking the MessageType field
             // Cast to base Message to peek at the type
             Message* baseMsg = reinterpret_cast<Message*>(buffer);
-            
+
             // First check if this looks like a valid message type
             MessageType msgType = baseMsg->type;
             int typeValue = static_cast<int>(msgType);
-            
+
             // Valid MessageType enum values are 0-10
             // If we get garbage data (like 223), it's from Radar which doesn't properly initialize all fields
             // REQUEST_POSITION (3) is always from Radar
             // Types 4-10 are from Communications System (operator commands)
             bool isValidType = (typeValue >= 0 && typeValue <= 10);
             bool isInterProcess = isValidType && (msgType != MessageType::REQUEST_POSITION);
-            
+
             // Radar requested position data
             if (isInterProcess){  //sporadic - from Communications System
             	// Message is of type Message_inter_process
             	Message_inter_process* receivedMsg = reinterpret_cast<Message_inter_process*>(buffer);
 
             	// Debug output
-            	std::cout << "Aircraft " << id << " received inter-process message, type: " 
+            	std::cout << "Aircraft " << id << " received inter-process message, type: "
             	          << static_cast<int>(receivedMsg->type) << "\n";
 
             	// COEN320 Lab 4_5: Handle different message types from Communications System
@@ -172,54 +173,54 @@ int Aircraft::updatePosition() {
                     case MessageType::REQUEST_CHANGE_OF_HEADING: {
                         msg_change_heading* heading_data = reinterpret_cast<msg_change_heading*>(receivedMsg->data.data());
                         std::cout << "Aircraft " << id << " received heading change command\n";
-                        std::cout << "  New velocities: VX=" << heading_data->VelocityX 
-                                  << " VY=" << heading_data->VelocityY 
+                        std::cout << "  New velocities: VX=" << heading_data->VelocityX
+                                  << " VY=" << heading_data->VelocityY
                                   << " VZ=" << heading_data->VelocityZ << "\n";
-                        
+
                         // Apply the heading change
                         changeHeading(heading_data->VelocityX, heading_data->VelocityY, heading_data->VelocityZ);
-                        
+
                         // Reply to acknowledge
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
                     }
-                    
+
                     case MessageType::REQUEST_CHANGE_POSITION: {
                         msg_change_position* pos_data = reinterpret_cast<msg_change_position*>(receivedMsg->data.data());
                         std::cout << "Aircraft " << id << " received position change command\n";
-                        std::cout << "  New position: X=" << pos_data->x 
-                                  << " Y=" << pos_data->y 
+                        std::cout << "  New position: X=" << pos_data->x
+                                  << " Y=" << pos_data->y
                                   << " Z=" << pos_data->z << "\n";
-                        
+
                         // Apply the position change
                         posX = pos_data->x;
                         posY = pos_data->y;
                         posZ = pos_data->z;
-                        
+
                         std::cout << "Aircraft " << id << " position updated\n";
-                        
+
                         // Reply to acknowledge
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
                     }
-                    
+
                     case MessageType::REQUEST_CHANGE_ALTITUDE: {
                         msg_change_heading* altitude_data = reinterpret_cast<msg_change_heading*>(receivedMsg->data.data());
                         std::cout << "Aircraft " << id << " received altitude change command\n";
                         std::cout << "  New altitude: Z=" << altitude_data->altitude << "\n";
-                        
+
                         // Apply the altitude change
                         posZ = altitude_data->altitude;
-                        
+
                         std::cout << "Aircraft " << id << " altitude updated to " << posZ << "\n";
-                        
+
                         // Reply to acknowledge
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
                     }
-                    
+
                     default:
-                        std::cerr << "Aircraft " << id << " received unknown inter-process message type: " 
+                        std::cerr << "Aircraft " << id << " received unknown inter-process message type: "
                                   << static_cast<int>(receivedMsg->type) << "\n";
                         MsgReply(rcvid, -1, NULL, 0);
                         break;
