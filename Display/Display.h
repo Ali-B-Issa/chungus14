@@ -16,6 +16,7 @@
 #include <vector>
 #include <set>
 #include <mutex>
+#include <utility>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -62,6 +63,7 @@ private:
 
     // Track planes involved in collisions for highlighting
     std::set<int> planesInCollision;
+    std::vector<std::pair<int, int>> collisionPairs;  // Store which planes collide with which
     std::mutex collisionMutex;
     uint64_t lastCollisionTime;  // Timestamp of last collision message
 
