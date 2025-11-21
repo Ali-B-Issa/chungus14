@@ -152,6 +152,7 @@ void Display::listenForCollisions() {
             
             std::lock_guard<std::mutex> lock(collisionMutex);
             planesInCollision.clear();
+            collisionPairs.clear();
             
             // Update collision time
             lastCollisionTime = shared_mem->timestamp;
@@ -159,6 +160,7 @@ void Display::listenForCollisions() {
             for (size_t i = 0; i < numPairs; i++) {
                 planesInCollision.insert(pairs[i].first);
                 planesInCollision.insert(pairs[i].second);
+                collisionPairs.push_back(pairs[i]);
                 
                 // Print collision warning
                 std::cout << "\n*** COLLISION WARNING: Aircraft " << pairs[i].first 
@@ -249,6 +251,7 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     uint64_t currentTime = shared_mem->timestamp;
     if (!planesInCollision.empty() && (currentTime - lastCollisionTime) > 2) {
         planesInCollision.clear();
+        collisionPairs.clear();
     }
     
     // Initialize grid with empty spaces
@@ -273,76 +276,79 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     }
     
     // Print header
-    std::cout << "╔════════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║           AIRSPACE GRID DISPLAY - Timestamp: " << std::setw(10) << shared_mem->timestamp << "            ║\n";
-    std::cout << "║           Aircraft: " << std::setw(3) << planes.size() << "    Airspace: 100km x 100km                    ║\n";
-    std::cout << "╠════════════════════════════════════════════════════════════════════╣\n";
+    std::cout << "=========================================================================\n";
+    std::cout << "           AIRSPACE GRID DISPLAY - Timestamp: " << std::setw(10) << shared_mem->timestamp << "\n";
+    std::cout << "           Aircraft: " << std::setw(3) << planes.size() << "    Airspace: 100km x 100km\n";
+    std::cout << "=========================================================================\n";
     
     // Print Y-axis label (top)
-    std::cout << "║ Y=100k                                                              ║\n";
+    std::cout << " Y=100k\n";
     
     // Print top border of grid
-    std::cout << "║  ┌";
-    for (int x = 0; x < GRID_WIDTH; x++) std::cout << "─";
-    std::cout << "┐  ║\n";
+    std::cout << "  +";
+    for (int x = 0; x < GRID_WIDTH; x++) std::cout << "-";
+    std::cout << "+\n";
     
     // Print grid rows
     for (int y = 0; y < GRID_HEIGHT; y++) {
-        std::cout << "║  │";
+        std::cout << "  |";
         for (int x = 0; x < GRID_WIDTH; x++) {
-            // Handle multi-character labels
             if (grid[y][x] != " " && grid[y][x].length() > 1) {
                 std::cout << grid[y][x];
-                // Skip cells that the label overlaps
                 int skip = grid[y][x].length() - 1;
                 x += skip;
-                // Fill remaining space if we went past
-                while (skip > 0 && x < GRID_WIDTH) {
-                    skip--;
-                }
             } else {
                 std::cout << grid[y][x];
             }
         }
-        std::cout << "│  ║\n";
+        std::cout << "|\n";
     }
     
     // Print bottom border of grid
-    std::cout << "║  └";
-    for (int x = 0; x < GRID_WIDTH; x++) std::cout << "─";
-    std::cout << "┘  ║\n";
+    std::cout << "  +";
+    for (int x = 0; x < GRID_WIDTH; x++) std::cout << "-";
+    std::cout << "+\n";
     
-    // Print Y-axis label (bottom) and X-axis labels
-    std::cout << "║ Y=0   X=0                                                    X=100k ║\n";
+    // Print axis labels
+    std::cout << " Y=0   X=0                                                    X=100k\n";
     
     // Print legend
-    std::cout << "╠════════════════════════════════════════════════════════════════════╣\n";
-    std::cout << "║ Legend: >N = East  <N = West  ^N = North  vN = South  oN = Static  ║\n";
-    std::cout << "║         !N! = COLLISION WARNING                                    ║\n";
-    std::cout << "╠════════════════════════════════════════════════════════════════════╣\n";
+    std::cout << "=========================================================================\n";
+    std::cout << " Legend: >N=East  <N=West  ^N=North  vN=South  oN=Static  !N!=COLLISION\n";
+    std::cout << "=========================================================================\n";
     
-    // Print aircraft details below grid
-    std::cout << "║ Aircraft Details:                                                  ║\n";
+    // Print aircraft details
+    std::cout << " Aircraft Details:\n";
+    std::cout << "-------------------------------------------------------------------------\n";
+    
     for (const auto& plane : planes) {
         bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
-        std::string status = inCollision ? "!COLLISION!" : "OK";
         
-        std::ostringstream oss;
-        oss << "║  ID:" << std::setw(2) << plane.id 
-            << " Pos(" << std::setw(6) << (int)plane.PositionX << "," 
-            << std::setw(6) << (int)plane.PositionY << "," 
-            << std::setw(6) << (int)plane.PositionZ << ")"
-            << " Vel(" << std::setw(4) << (int)plane.VelocityX << "," 
-            << std::setw(4) << (int)plane.VelocityY << "," 
-            << std::setw(4) << (int)plane.VelocityZ << ")"
-            << " " << std::setw(11) << status;
+        // Find collision partner(s)
+        std::string collisionInfo = "";
+        if (inCollision) {
+            for (const auto& pair : collisionPairs) {
+                if (pair.first == plane.id) {
+                    collisionInfo = " COLLISION WITH PLANE " + std::to_string(pair.second);
+                } else if (pair.second == plane.id) {
+                    collisionInfo = " COLLISION WITH PLANE " + std::to_string(pair.first);
+                }
+            }
+        }
         
-        std::string line = oss.str();
-        // Pad to fit box
-        while (line.length() < 68) line += " ";
-        line += "║";
-        std::cout << line << "\n";
+        std::cout << "  ID:" << std::setw(2) << plane.id 
+                  << " Pos(" << std::setw(6) << (int)plane.PositionX << "," 
+                  << std::setw(6) << (int)plane.PositionY << "," 
+                  << std::setw(6) << (int)plane.PositionZ << ")"
+                  << " Vel(" << std::setw(4) << (int)plane.VelocityX << "," 
+                  << std::setw(4) << (int)plane.VelocityY << "," 
+                  << std::setw(4) << (int)plane.VelocityZ << ")";
+        
+        if (inCollision) {
+            std::cout << collisionInfo;
+        }
+        std::cout << "\n";
     }
     
-    std::cout << "╚════════════════════════════════════════════════════════════════════╝\n";
+    std::cout << "=========================================================================\n";
 }
