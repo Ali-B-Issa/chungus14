@@ -25,7 +25,7 @@ const double AIRSPACE_MAX_X = 100000;
 const double AIRSPACE_MIN_Y = 0;
 const double AIRSPACE_MAX_Y = 100000;
 
-Display::Display() : shm_fd(-1), shared_mem(nullptr), display_channel(nullptr), running(false) {}
+Display::Display() : shm_fd(-1), shared_mem(nullptr), display_channel(nullptr), running(false), lastCollisionTime(0) {}
 
 Display::~Display() {
     shutdown();
@@ -153,6 +153,9 @@ void Display::listenForCollisions() {
             std::lock_guard<std::mutex> lock(collisionMutex);
             planesInCollision.clear();
             
+            // Update collision time
+            lastCollisionTime = shared_mem->timestamp;
+            
             for (size_t i = 0; i < numPairs; i++) {
                 planesInCollision.insert(pairs[i].first);
                 planesInCollision.insert(pairs[i].second);
@@ -241,6 +244,12 @@ char Display::getDirectionArrow(double vx, double vy) {
 
 void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     std::lock_guard<std::mutex> lock(collisionMutex);
+    
+    // Clear collision warnings if no new collision for 2 seconds
+    uint64_t currentTime = shared_mem->timestamp;
+    if (!planesInCollision.empty() && (currentTime - lastCollisionTime) > 2) {
+        planesInCollision.clear();
+    }
     
     // Initialize grid with empty spaces
     std::vector<std::vector<std::string>> grid(GRID_HEIGHT, std::vector<std::string>(GRID_WIDTH, " "));
