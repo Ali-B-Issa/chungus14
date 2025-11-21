@@ -6,21 +6,27 @@
  */
 #include "CommunicationsSystem.h"
 #include "ATCTimer.h"
-#include <ctime>        // For std::time_t, std::localtime
-#include <iomanip>      // For std::put_time
+#include <ctime>
+#include <iomanip>
 #include <cmath>
 #include <sys/dispatch.h>
-#include <cstring> // For memcpy
+#include <cstring>
 
-// COEN320 Task 4: Define the communications system channel name
 #define COMMS_CHANNEL_NAME "AH_40247851_40228573_Comms"
 
-CommunicationsSystem::CommunicationsSystem() {
-    // Start the communications handling thread
+CommunicationsSystem::CommunicationsSystem() : comms_channel(nullptr), stopThread(false) {
     Communications_System = std::thread(&CommunicationsSystem::HandleCommunications, this);
 }
 
 CommunicationsSystem::~CommunicationsSystem() {
+    stopThread = true;
+    
+    // Detach channel to unblock MsgReceive
+    if (comms_channel) {
+        name_detach(comms_channel, 0);
+        comms_channel = nullptr;
+    }
+    
     if (Communications_System.joinable()) {
         Communications_System.join();
     }
@@ -29,54 +35,60 @@ CommunicationsSystem::~CommunicationsSystem() {
 void CommunicationsSystem::HandleCommunications() {
     std::cout << "Communications System started\n";
 
-    // Create channel for receiving commands from Operator Console
-    name_attach_t* comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
-
+    // Try to create channel with retries
+    int retries = 5;
+    while (retries > 0 && comms_channel == NULL) {
+        comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
+        
+        if (comms_channel == NULL) {
+            std::cerr << "Failed to create Communications System channel, retrying... (" 
+                      << strerror(errno) << ")\n";
+            sleep(1);
+            retries--;
+        }
+    }
+    
     if (comms_channel == NULL) {
-        std::cerr << "Failed to create Communications System channel\n";
+        std::cerr << "Failed to create Communications System channel after retries\n";
+        std::cerr << "Error: " << strerror(errno) << "\n";
         return;
     }
 
     std::cout << "Communications System listening on channel: " << COMMS_CHANNEL_NAME << "\n";
 
-    while (true) {
-        // Receive Message_inter_process (not Message)
+    while (!stopThread) {
         Message_inter_process msg;
-        memset(&msg, 0, sizeof(msg));  // Clear the buffer before receiving
+        memset(&msg, 0, sizeof(msg));
+        
+        // Set timeout so we can check stopThread flag
+        struct sigevent event;
+        SIGEV_UNBLOCK_INIT(&event);
+        uint64_t timeout = 500000000ULL; // 500ms
+        TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &event, &timeout, NULL);
         
         int rcvid = MsgReceive(comms_channel->chid, &msg, sizeof(msg), NULL);
 
         if (rcvid == -1) {
-            std::cerr << "Error receiving message: " << strerror(errno) << "\n";
-            continue;  // Error receiving message
-        }
-
-        // Skip pulses (rcvid == 0)
-        if (rcvid == 0) {
-            // This is a pulse, not a message - just continue silently
             continue;
         }
 
-        // Check if this is an inter-process message
+        if (rcvid == 0) {
+            continue;
+        }
+
         if (!msg.header) {
-            // This is NOT an inter-process message
-            // Reply and continue silently - this can happen with system messages
             MsgReply(rcvid, 0, NULL, 0);
             continue;
         }
 
-        // Debug: Print received message details
         std::cout << "Communications System received message:\n";
         std::cout << "  Plane ID: " << msg.planeID << "\n";
         std::cout << "  Type: " << static_cast<int>(msg.type) << "\n";
         std::cout << "  Data Size: " << msg.dataSize << "\n";
 
-        // Reply to acknowledge receipt BEFORE forwarding
-        // This allows the Operator Console to continue immediately
         int reply = 0;
         MsgReply(rcvid, 0, &reply, sizeof(reply));
 
-        // Process the message based on type
         switch (msg.type) {
             case MessageType::REQUEST_CHANGE_OF_HEADING:
                 std::cout << "Forwarding heading change request to Plane " << msg.planeID << "\n";
@@ -95,8 +107,8 @@ void CommunicationsSystem::HandleCommunications() {
 
             case MessageType::EXIT:
                 std::cout << "Exit command received\n";
-                name_detach(comms_channel, 0);
-                return;
+                stopThread = true;
+                break;
 
             default:
                 std::cerr << "Unknown message type received: " << static_cast<int>(msg.type) << "\n";
@@ -104,11 +116,15 @@ void CommunicationsSystem::HandleCommunications() {
         }
     }
 
-    name_detach(comms_channel, 0);
+    if (comms_channel) {
+        name_detach(comms_channel, 0);
+        comms_channel = nullptr;
+    }
+    
+    std::cout << "Communications System stopped\n";
 }
 
 void CommunicationsSystem::messageAircraft(const Message_inter_process& msg) {
-    // Open channel to the specific aircraft
     std::string plane_channel_name = "AH_40247851_40228573_" + std::to_string(msg.planeID);
     int plane_channel = name_open(plane_channel_name.c_str(), 0);
 
@@ -121,7 +137,6 @@ void CommunicationsSystem::messageAircraft(const Message_inter_process& msg) {
 
     std::cout << "Successfully opened channel to Plane " << msg.planeID << "\n";
 
-    // Send the Message_inter_process directly to the aircraft
     int reply;
     if (MsgSend(plane_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
         std::cerr << "Failed to send message to Plane " << msg.planeID << "\n";
