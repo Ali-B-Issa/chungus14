@@ -1,19 +1,3 @@
-/*
- * main.cpp - Display System
- * 
- * ATC Display System for COEN320 Project
- * Group: AH_40247851_40228573
- * 
- * This is a separate QNX project that runs independently from
- * the Radar and Computer System processes.
- * 
- * Functions:
- * 1. Reads aircraft data from shared memory (written by Radar)
- * 2. Displays aircraft positions in a text-based grid
- * 3. Receives collision warnings from Computer System via IPC
- * 4. Highlights aircraft involved in potential collisions
- */
-
 #include "Display.h"
 #include <iostream>
 #include <csignal>
@@ -58,6 +42,6 @@ int main() {
     std::cout << "\n╔════════════════════════════════════════════╗\n";
     std::cout << "║      Display System Shutdown Complete      ║\n";
     std::cout << "╚════════════════════════════════════════════╝\n";
-    
+
     return EXIT_SUCCESS;
 }

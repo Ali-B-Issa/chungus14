@@ -11,7 +11,7 @@ ATCTimer::ATCTimer(uint32_t sec, uint32_t msec) {
 	if(connection_id == -1){
 		std::cerr << "Timer, Connect Attach error : " << errno << "\n";
 	}
-	
+
 	// Initialize the signal event for the timer
 	SIGEV_PULSE_INIT(&sig_event, connection_id, SIGEV_PULSE_PRIO_INHERIT, 1, 0);
 
@@ -19,13 +19,13 @@ ATCTimer::ATCTimer(uint32_t sec, uint32_t msec) {
 	if (timer_create(CLOCK_REALTIME, &sig_event, &timer_id) == -1){
 		std::cerr << "Timer, Init error : " << errno << "\n";
 	}
-	
+
 	// Set up the timer specifications (interval and initial expiration)
 	setTimerSpecification(sec,1000000* msec); //converting ms to ns
 
 	// Get the system's cycles per second for time calculations
 	cycles_per_sec = SYSPAGE_ENTRY(qtime)->cycles_per_sec;
-	
+
 
 }
 
@@ -70,4 +70,3 @@ double ATCTimer::tock(){
 	// Calculate and return the elapsed time in milliseconds
 	return (double)(tock_cycles - tick_cycles) / cycles_per_sec * 1000.0;
 }
-

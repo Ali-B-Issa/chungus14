@@ -1,13 +1,3 @@
-/*
- * Display.cpp
- * 
- * Display System for ATC Project
- * Group: AH_40247851_40228573
- * 
- * Shows aircraft on a 2D grid based on X,Y positions
- * Collision warnings shown as !ID!
- */
-
 #include "Display.h"
 #include "ATCTimer.h"
 #include <iomanip>
@@ -54,7 +44,7 @@ bool Display::initializeSharedMemory() {
             continue;
         }
 
-        shared_mem = (SharedMemory*)mmap(NULL, sizeof(SharedMemory), 
+        shared_mem = (SharedMemory*)mmap(NULL, sizeof(SharedMemory),
                                           PROT_READ, MAP_SHARED, shm_fd, 0);
         if (shared_mem == MAP_FAILED) {
             std::cerr << "Display: Failed to map shared memory\n";
@@ -100,24 +90,24 @@ void Display::cleanupIPCChannel() {
 
 void Display::shutdown() {
     running = false;
-    
+
     if (displayThread.joinable()) {
         displayThread.join();
     }
     if (collisionListenerThread.joinable()) {
         collisionListenerThread.join();
     }
-    
+
     cleanupIPCChannel();
     cleanupSharedMemory();
-    
+
     std::cout << "Display: Shutdown complete\n";
 }
 
 void Display::run() {
     displayThread = std::thread(&Display::displayAircraft, this);
     collisionListenerThread = std::thread(&Display::listenForCollisions, this);
-    
+
     if (displayThread.joinable()) {
         displayThread.join();
     }
@@ -128,59 +118,59 @@ void Display::run() {
 
 void Display::listenForCollisions() {
     std::cout << "Display: Collision listener started\n";
-    
+
     while (running) {
         Message_inter_process msg;
         memset(&msg, 0, sizeof(msg));
-        
+
         struct sigevent event;
         SIGEV_UNBLOCK_INIT(&event);
         uint64_t timeout = 500000000ULL;
         TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &event, &timeout, NULL);
-        
+
         int rcvid = MsgReceive(display_channel->chid, &msg, sizeof(msg), NULL);
-        
+
         if (rcvid == -1) continue;
         if (rcvid == 0) continue;
-        
+
         int reply = 0;
         MsgReply(rcvid, 0, &reply, sizeof(reply));
-        
+
         if (msg.type == MessageType::COLLISION_DETECTED) {
             size_t numPairs = msg.dataSize / sizeof(std::pair<int, int>);
             std::pair<int, int>* pairs = reinterpret_cast<std::pair<int, int>*>(msg.data.data());
-            
+
             std::lock_guard<std::mutex> lock(collisionMutex);
             planesInCollision.clear();
             collisionPairs.clear();
-            
+
             // Update collision time
             lastCollisionTime = shared_mem->timestamp;
-            
+
             for (size_t i = 0; i < numPairs; i++) {
                 planesInCollision.insert(pairs[i].first);
                 planesInCollision.insert(pairs[i].second);
                 collisionPairs.push_back(pairs[i]);
-                
+
                 // Print collision warning
-                std::cout << "\n*** COLLISION WARNING: Aircraft " << pairs[i].first 
+                std::cout << "\n*** COLLISION WARNING: Aircraft " << pairs[i].first
                           << " and " << pairs[i].second << " ***\n\n";
             }
         }
     }
-    
+
     std::cout << "Display: Collision listener stopped\n";
 }
 
 void Display::displayAircraft() {
     ATCTimer timer(1, 0);
     std::cout << "Display: Aircraft display thread started\n";
-    
+
     while (running && shared_mem->is_empty.load()) {
         std::cout << "Display: Waiting for aircraft to enter airspace...\n";
         timer.waitTimer();
     }
-    
+
     while (running) {
         if (shared_mem->is_empty.load()) {
             clearScreen();
@@ -188,19 +178,19 @@ void Display::displayAircraft() {
             running = false;
             break;
         }
-        
+
         std::vector<msg_plane_info> planes;
         int count = shared_mem->count;
-        
+
         for (int i = 0; i < count && i < 100; i++) {
             planes.push_back(shared_mem->plane_data[i]);
         }
-        
+
         clearScreen();
         printAirspaceGrid(planes);
         timer.waitTimer();
     }
-    
+
     std::cout << "Display: Aircraft display thread stopped\n";
 }
 
@@ -229,9 +219,9 @@ int Display::airspaceToGridY(double y) {
 // Get direction arrow based on velocity
 char Display::getDirectionArrow(double vx, double vy) {
     if (vx == 0 && vy == 0) return 'o';  // Stationary
-    
+
     double angle = atan2(vy, vx) * 180.0 / 3.14159265;
-    
+
     if (angle >= -22.5 && angle < 22.5) return '>';       // East
     if (angle >= 22.5 && angle < 67.5) return '/';        // Northeast (display inverted)
     if (angle >= 67.5 && angle < 112.5) return '^';       // North
@@ -240,30 +230,30 @@ char Display::getDirectionArrow(double vx, double vy) {
     if (angle >= -157.5 && angle < -112.5) return '/';    // Southwest (display inverted)
     if (angle >= -112.5 && angle < -67.5) return 'v';     // South
     if (angle >= -67.5 && angle < -22.5) return '\\';     // Southeast (display inverted)
-    
+
     return 'o';
 }
 
 void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     std::lock_guard<std::mutex> lock(collisionMutex);
-    
+
     // Clear collision warnings if no new collision for 2 seconds
     uint64_t currentTime = shared_mem->timestamp;
     if (!planesInCollision.empty() && (currentTime - lastCollisionTime) > 2) {
         planesInCollision.clear();
         collisionPairs.clear();
     }
-    
+
     // Initialize grid with empty spaces
     std::vector<std::vector<std::string>> grid(GRID_HEIGHT, std::vector<std::string>(GRID_WIDTH, " "));
-    
+
     // Place aircraft on grid
     for (const auto& plane : planes) {
         int gx = airspaceToGridX(plane.PositionX);
         int gy = airspaceToGridY(plane.PositionY);
-        
+
         bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
-        
+
         std::string label;
         if (inCollision) {
             label = "!" + std::to_string(plane.id) + "!";
@@ -271,24 +261,24 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
             char arrow = getDirectionArrow(plane.VelocityX, plane.VelocityY);
             label = std::string(1, arrow) + std::to_string(plane.id);
         }
-        
+
         grid[gy][gx] = label;
     }
-    
+
     // Print header
     std::cout << "=========================================================================\n";
     std::cout << "           AIRSPACE GRID DISPLAY - Timestamp: " << std::setw(10) << shared_mem->timestamp << "\n";
     std::cout << "           Aircraft: " << std::setw(3) << planes.size() << "    Airspace: 100km x 100km\n";
     std::cout << "=========================================================================\n";
-    
+
     // Print Y-axis label (top)
     std::cout << " Y=100k\n";
-    
+
     // Print top border of grid
     std::cout << "  +";
     for (int x = 0; x < GRID_WIDTH; x++) std::cout << "-";
     std::cout << "+\n";
-    
+
     // Print grid rows
     for (int y = 0; y < GRID_HEIGHT; y++) {
         std::cout << "  |";
@@ -303,27 +293,27 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
         }
         std::cout << "|\n";
     }
-    
+
     // Print bottom border of grid
     std::cout << "  +";
     for (int x = 0; x < GRID_WIDTH; x++) std::cout << "-";
     std::cout << "+\n";
-    
+
     // Print axis labels
     std::cout << " Y=0   X=0                                                    X=100k\n";
-    
+
     // Print legend
     std::cout << "=========================================================================\n";
     std::cout << " Legend: >N=East  <N=West  ^N=North  vN=South  oN=Static  !N!=COLLISION\n";
     std::cout << "=========================================================================\n";
-    
+
     // Print aircraft details
     std::cout << " Aircraft Details:\n";
     std::cout << "-------------------------------------------------------------------------\n";
-    
+
     for (const auto& plane : planes) {
         bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
-        
+
         // Find collision partner(s)
         std::string collisionInfo = "";
         if (inCollision) {
@@ -335,20 +325,20 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
                 }
             }
         }
-        
-        std::cout << "  ID:" << std::setw(2) << plane.id 
-                  << " Pos(" << std::setw(6) << (int)plane.PositionX << "," 
-                  << std::setw(6) << (int)plane.PositionY << "," 
+
+        std::cout << "  ID:" << std::setw(2) << plane.id
+                  << " Pos(" << std::setw(6) << (int)plane.PositionX << ","
+                  << std::setw(6) << (int)plane.PositionY << ","
                   << std::setw(6) << (int)plane.PositionZ << ")"
-                  << " Vel(" << std::setw(4) << (int)plane.VelocityX << "," 
-                  << std::setw(4) << (int)plane.VelocityY << "," 
+                  << " Vel(" << std::setw(4) << (int)plane.VelocityX << ","
+                  << std::setw(4) << (int)plane.VelocityY << ","
                   << std::setw(4) << (int)plane.VelocityZ << ")";
-        
+
         if (inCollision) {
             std::cout << collisionInfo;
         }
         std::cout << "\n";
     }
-    
+
     std::cout << "=========================================================================\n";
 }

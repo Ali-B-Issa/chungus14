@@ -1,10 +1,3 @@
-/*
- * Msg_structs.h
- * 
- * Copy this file to your Display project.
- * This must match the structures used in Radar and ComputerSystem.
- */
-
 #pragma once
 #include <atomic>
 #include <array>
