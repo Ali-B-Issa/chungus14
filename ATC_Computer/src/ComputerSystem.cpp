@@ -201,18 +201,35 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
         return true;
     }
 
-    // Calculate relative velocities
+    // Calculate relative velocities (velocity of plane1 in plane2's reference frame)
     double relativeVelX = plane1.VelocityX - plane2.VelocityX;
     double relativeVelY = plane1.VelocityY - plane2.VelocityY;
     double relativeVelZ = plane1.VelocityZ - plane2.VelocityZ;
 
-    // Calculate relative positions
+    // Calculate relative positions (position of plane1 relative to plane2)
     double relativeX = plane1.PositionX - plane2.PositionX;
     double relativeY = plane1.PositionY - plane2.PositionY;
     double relativeZ = plane1.PositionZ - plane2.PositionZ;
 
-    // Check collision at multiple time steps using relative motion
-    for (int t = 1; t <= timeConstraintCollisionFreq; t++) {
+    // If relative velocity is nearly zero, planes are moving in parallel
+    // Check if they're close now (already done above) or will remain at same distance
+    double relVelMagnitude = std::sqrt(relativeVelX * relativeVelX + 
+                                       relativeVelY * relativeVelY + 
+                                       relativeVelZ * relativeVelZ);
+    
+    if (relVelMagnitude < 1.0) {
+        // Planes moving in parallel or nearly stationary relative to each other
+        // Already checked current distance above
+        return false;
+    }
+
+    // Check collision at smaller time intervals (0.5 second steps) for better accuracy
+    double timeStep = 0.5;
+    int numSteps = static_cast<int>(timeConstraintCollisionFreq / timeStep);
+    
+    for (int i = 1; i <= numSteps; i++) {
+        double t = i * timeStep;
+        
         // Calculate future relative positions
         double futureRelX = relativeX + relativeVelX * t;
         double futureRelY = relativeY + relativeVelY * t;
