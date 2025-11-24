@@ -163,12 +163,13 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	for (size_t j = i + 1; j < planes.size(); j++) {
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
-    			//std::cout << "Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
-
+    			std::cout << "DEBUG: Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
     			collisionPairs.emplace_back(planes[i].id, planes[j].id);
     		}
     	}
     }
+
+    std::cout << "DEBUG: Total collision pairs this cycle: " << collisionPairs.size() << std::endl;
 
     // COEN320 Task 3.5
     // In the case of collision send message to Display system
@@ -186,6 +187,9 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
 
     	sendCollisionToDisplay(msg_to_send);
+    	std::cout << "DEBUG: Sent collision message to Display with " << numPairs << " pairs" << std::endl;
+    } else {
+    	std::cout << "DEBUG: No collisions this cycle" << std::endl;
     }
     
 }
@@ -246,4 +250,5 @@ void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
 	if (status == -1) {
 		perror("Computer system: Error occurred while sending message to display channel");
 	}
+	name_close(display_channel);
 }
