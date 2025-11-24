@@ -196,7 +196,7 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
     double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
 
-    // Check if planes are currently too close
+    // Check if planes are currently too close - this is a collision NOW
     if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
         return true;
     }
@@ -210,18 +210,6 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     double relativeX = plane1.PositionX - plane2.PositionX;
     double relativeY = plane1.PositionY - plane2.PositionY;
     double relativeZ = plane1.PositionZ - plane2.PositionZ;
-
-    // If relative velocity is nearly zero, planes are moving in parallel
-    // Check if they're close now (already done above) or will remain at same distance
-    double relVelMagnitude = std::sqrt(relativeVelX * relativeVelX + 
-                                       relativeVelY * relativeVelY + 
-                                       relativeVelZ * relativeVelZ);
-    
-    if (relVelMagnitude < 1.0) {
-        // Planes moving in parallel or nearly stationary relative to each other
-        // Already checked current distance above
-        return false;
-    }
 
     // Check collision at smaller time intervals (0.5 second steps) for better accuracy
     double timeStep = 0.5;
