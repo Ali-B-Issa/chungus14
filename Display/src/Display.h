@@ -6,6 +6,7 @@
 #include <atomic>
 #include <vector>
 #include <set>
+#include <map>
 #include <mutex>
 #include <utility>
 #include <fcntl.h>
@@ -52,9 +53,8 @@ private:
     // Control flags
     std::atomic<bool> running;
 
-    // Track planes involved in collisions for highlighting
-    std::set<int> planesInCollision;
-    std::vector<std::pair<int, int>> collisionPairs;  // Store which planes collide with which
+    // Track planes involved in collisions - maps plane ID to set of planes it collides with
+    std::map<int, std::set<int>> planeCollisions;
     std::mutex collisionMutex;
     uint64_t lastCollisionTime;  // Timestamp of last collision message
 
