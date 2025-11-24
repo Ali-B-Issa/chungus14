@@ -17,10 +17,10 @@
 #include <errno.h>
 #include "Msg_structs.h"
 
-// Display channel name - MUST match ComputerSystem.cpp definition
+// Display channel name 
 #define DISPLAY_CHANNEL_NAME "40247851_40228573_Display"
 
-// Shared memory name - MUST match Radar.cpp definition
+// Shared memory name 
 #define SHARED_MEMORY_NAME "/tmp/AH_40247851_40228573_Radar_shm"
 
 class Display {
@@ -82,3 +82,4 @@ private:
 };
 
 #endif /* DISPLAY_H_ */
+
