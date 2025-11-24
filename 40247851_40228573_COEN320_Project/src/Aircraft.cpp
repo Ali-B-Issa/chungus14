@@ -50,7 +50,6 @@ void Aircraft::printInitialAircraftData() const {
 
 
 void Aircraft::changeHeading(double Vx, double Vy, double Vz){
-	// FIXED: Original code had bugs checking Vx three times
 	if (Vx != 0) speedX = Vx;
 	if (Vy != 0) speedY = Vy;
 	if (Vz != 0) speedZ = Vz;
@@ -122,9 +121,9 @@ int Aircraft::updatePosition() {
         posZ += speedZ;
 
         // Debug: Print the new position
-        if (id == 2){
+      /*  if (id == 2){// printing the change for only specific planes change as needed
         std::cout << "Updated Position: (" << posX << ", " << posY << ", " << posZ << ")\n";
-        }
+        }*/
         // Check if the plane is still within airspace boundaries
         if (posX < airspace.lower_x_boundary || posX > airspace.upper_x_boundary ||
             posY < airspace.lower_y_boundary || posY > airspace.upper_y_boundary ||
