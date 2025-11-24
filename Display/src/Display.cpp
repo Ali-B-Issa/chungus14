@@ -194,9 +194,9 @@ void Display::displayAircraft() {
 void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     std::lock_guard<std::mutex> lock(collisionMutex);
 
-    // Clear collision warnings if no new collision for 2 seconds
+    // Clear collision warnings if no new collision for 5 seconds (increased from 2)
     uint64_t currentTime = shared_mem->timestamp;
-    if (!planeCollisions.empty() && (currentTime - lastCollisionTime) > 2) {
+    if (!planeCollisions.empty() && (currentTime - lastCollisionTime) > 5) {
         planeCollisions.clear();
     }
 
