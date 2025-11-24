@@ -115,10 +115,11 @@ void ComputerSystem::monitorAirspace() {
             }
         }
 
-		if (plane_data_vector.size()>1)
+		if (plane_data_vector.size() > 1) {
             checkCollision(timestamp, plane_data_vector);
-		else
+		} else {
            // std::cout << "No collision possible with single plane\n";
+		}
         // Sleep for a short interval before the next poll
        timer.waitTimer();
     }
@@ -126,7 +127,7 @@ void ComputerSystem::monitorAirspace() {
 }
 
 void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_info> planes) {
-   // std::cout << "Checking for collisions at time: " << currentTime << std::endl;
+   std::cout << "Checking for collisions at time: " << currentTime << " with " << planes.size() << " planes\n";
     // COEN320 Task 3.4
     // detect collisions between planes in the airspace within the time constraint
     // You need to Iterate through each pair of planes and in case of collision,
@@ -163,7 +164,7 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	for (size_t j = i + 1; j < planes.size(); j++) {
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
-    			//std::cout << "Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
+    			std::cout << "Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
 
     			collisionPairs.emplace_back(planes[i].id, planes[j].id);
     		}
@@ -173,6 +174,7 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     // COEN320 Task 3.5
     // In the case of collision send message to Display system
     if (!collisionPairs.empty()) {
+    	std::cout << "Sending collision message with " << collisionPairs.size() << " collision pair(s)\n";
 
     	Message_inter_process msg_to_send;
 
@@ -191,59 +193,36 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
 }
 
 bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
-    // Calculate current distance between planes
+    // COEN320 Task 3.4
+    // A collision is defined as two planes entering the defined airspace constraints within the time constraint
+    // Check current positions first
     double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
     double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
     double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
 
-    // Calculate relative velocities (velocity of plane1 in plane2's reference frame)
-    double relativeVelX = plane1.VelocityX - plane2.VelocityX;
-    double relativeVelY = plane1.VelocityY - plane2.VelocityY;
-    double relativeVelZ = plane1.VelocityZ - plane2.VelocityZ;
-
-    // Calculate relative velocity magnitude
-    double relVelMagnitude = std::sqrt(relativeVelX * relativeVelX + 
-                                       relativeVelY * relativeVelY + 
-                                       relativeVelZ * relativeVelZ);
-
-    // If planes are moving in parallel (relative velocity near zero)
-    // Check ONLY current distance, as future distance will remain the same
-    if (relVelMagnitude < 1.0) {
-        // For parallel-moving planes, check if they're currently within collision distance
-        if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
-            return true;
-        }
-        return false;
-    }
-
-    // For planes with relative motion, check current position first
+    // Check if the planes are currently within the constraint distances
     if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
+        // Planes are too close - current collision detected
         return true;
     }
 
-    // Calculate relative positions (position of plane1 relative to plane2)
-    double relativeX = plane1.PositionX - plane2.PositionX;
-    double relativeY = plane1.PositionY - plane2.PositionY;
-    double relativeZ = plane1.PositionZ - plane2.PositionZ;
+    // Predict positions after time constraint to catch future collisions
+    double futureX1 = plane1.PositionX + plane1.VelocityX * timeConstraintCollisionFreq;
+    double futureY1 = plane1.PositionY + plane1.VelocityY * timeConstraintCollisionFreq;
+    double futureZ1 = plane1.PositionZ + plane1.VelocityZ * timeConstraintCollisionFreq;
 
-    // Check collision at smaller time intervals (0.5 second steps) for better accuracy
-    double timeStep = 0.5;
-    int numSteps = static_cast<int>(timeConstraintCollisionFreq / timeStep);
-    
-    for (int i = 1; i <= numSteps; i++) {
-        double t = i * timeStep;
-        
-        // Calculate future relative positions
-        double futureRelX = relativeX + relativeVelX * t;
-        double futureRelY = relativeY + relativeVelY * t;
-        double futureRelZ = relativeZ + relativeVelZ * t;
+    double futureX2 = plane2.PositionX + plane2.VelocityX * timeConstraintCollisionFreq;
+    double futureY2 = plane2.PositionY + plane2.VelocityY * timeConstraintCollisionFreq;
+    double futureZ2 = plane2.PositionZ + plane2.VelocityZ * timeConstraintCollisionFreq;
 
-        // Check if relative distance is within collision constraints
-        if (std::abs(futureRelX) < CONSTRAINT_X && 
-            std::abs(futureRelY) < CONSTRAINT_Y && 
-            std::abs(futureRelZ) < CONSTRAINT_Z) {
-            return true;
-        }
+    // Check if future positions will be within constraints
+    double futureDeltaX = std::abs(futureX1 - futureX2);
+    double futureDeltaY = std::abs(futureY1 - futureY2);
+    double futureDeltaZ = std::abs(futureZ1 - futureZ2);
+
+    if (futureDeltaX < CONSTRAINT_X && futureDeltaY < CONSTRAINT_Y && futureDeltaZ < CONSTRAINT_Z) {
+        // Future collision predicted
+        return true;
     }
 
     return false;
@@ -253,6 +232,7 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
 void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
 	int display_channel = name_open(display_channel_name, 0);
 	if (display_channel == -1) {
+		std::cerr << "Computer system: Error occurred while opening display channel: " << strerror(errno) << "\n";
 		throw std::runtime_error("Computer system: Error occurred while attaching to display");
 	}
 	int reply;
@@ -260,5 +240,9 @@ void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
 	int status = MsgSend(display_channel, &msg, sizeof(msg), &reply, sizeof(reply));
 	if (status == -1) {
 		perror("Computer system: Error occurred while sending message to display channel");
+	} else {
+		std::cout << "Computer system: Successfully sent collision message to display\n";
 	}
+	
+	name_close(display_channel);
 }
