@@ -141,19 +141,17 @@ void Display::listenForCollisions() {
             std::pair<int, int>* pairs = reinterpret_cast<std::pair<int, int>*>(msg.data.data());
 
             std::lock_guard<std::mutex> lock(collisionMutex);
-            planesInCollision.clear();
-            collisionPairs.clear();
+            
+            // Clear old collision data
+            planeCollisions.clear();
 
             // Update collision time
             lastCollisionTime = shared_mem->timestamp;
 
+            // Store all collision pairs in a map: planeID -> set of planes it collides with
             for (size_t i = 0; i < numPairs; i++) {
-                planesInCollision.insert(pairs[i].first);
-                planesInCollision.insert(pairs[i].second);
-                collisionPairs.push_back(pairs[i]);
-
-                //Debug Print collision warning
-              // std::cout << "\n*** COLLISION WARNING: Aircraft " << pairs[i].first << " and " << pairs[i].second << " ***\n\n";
+                planeCollisions[pairs[i].first].insert(pairs[i].second);
+                planeCollisions[pairs[i].second].insert(pairs[i].first);
             }
         }
     }
@@ -193,38 +191,23 @@ void Display::displayAircraft() {
     std::cout << "Display: Aircraft display thread stopped\n";
 }
 
-
-
-
 void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     std::lock_guard<std::mutex> lock(collisionMutex);
 
     // Clear collision warnings if no new collision for 2 seconds
     uint64_t currentTime = shared_mem->timestamp;
-    if (!planesInCollision.empty() && (currentTime - lastCollisionTime) > 2) {
-        planesInCollision.clear();
-        collisionPairs.clear();
+    if (!planeCollisions.empty() && (currentTime - lastCollisionTime) > 2) {
+        planeCollisions.clear();
     }
-
 
     // Print aircraft details
     std::cout << " Aircraft Details:\n";
     std::cout << "-------------------------------------------------------------------------\n";
 
     for (const auto& plane : planes) {
-        bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
-
-        // Find collision partner(s)
-        std::string collisionInfo = "";
-        if (inCollision) {
-            for (const auto& pair : collisionPairs) {
-                if (pair.first == plane.id) {
-                    collisionInfo = " COLLISION WITH PLANE " + std::to_string(pair.second);
-                } else if (pair.second == plane.id) {
-                    collisionInfo = " COLLISION WITH PLANE " + std::to_string(pair.first);
-                }
-            }
-        }
+        // Check if this plane is in any collision
+        auto it = planeCollisions.find(plane.id);
+        bool inCollision = (it != planeCollisions.end());
 
         std::cout << "  ID:" << std::setw(2) << plane.id
                   << " Pos(" << std::setw(6) << (int)plane.PositionX << ","
@@ -234,8 +217,22 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
                   << std::setw(4) << (int)plane.VelocityY << ","
                   << std::setw(4) << (int)plane.VelocityZ << ")";
 
+        // Print all planes this plane collides with
         if (inCollision) {
-            std::cout << collisionInfo;
+            std::cout << " COLLISION WITH PLANE";
+            if (it->second.size() > 1) {
+                std::cout << "S";  // Plural
+            }
+            std::cout << ":";
+            
+            bool first = true;
+            for (int collidingPlaneId : it->second) {
+                if (!first) {
+                    std::cout << ",";
+                }
+                std::cout << " " << collidingPlaneId;
+                first = false;
+            }
         }
         std::cout << "\n";
     }
