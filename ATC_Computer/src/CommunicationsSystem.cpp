@@ -1,261 +1,124 @@
-#include "ComputerSystem.h"
+#include "CommunicationsSystem.h"
 #include "ATCTimer.h"
 #include <ctime>        // For std::time_t, std::localtime
 #include <iomanip>      // For std::put_time
 #include <cmath>
 #include <sys/dispatch.h>
-#include "Msg_structs.h"
 #include <cstring> // For memcpy
 
-// COEN320 Task 3.1, set the display channel name
-#define display_channel_name "40247851_40228573_Display"
+// COEN320 Task 4: Define the communications system channel name
+#define COMMS_CHANNEL_NAME "AH_40247851_40228573_Comms"
 
-
-ComputerSystem::ComputerSystem() : shm_fd(-1), shared_mem(nullptr), running(false) {}
-
-ComputerSystem::~ComputerSystem() {
-    joinThread();
-    cleanupSharedMemory();
+CommunicationsSystem::CommunicationsSystem() {
+    // Start the communications handling thread
+    Communications_System = std::thread(&CommunicationsSystem::HandleCommunications, this);
 }
 
-bool ComputerSystem::initializeSharedMemory() {
-	// Open the shared memory object
-	while (true) {
-        // COEN320 Task 3.2
-		// Attempt to open the shared memory object (You need to use the same name as Task 2 in Radar)
-        // In case of error, retry until successful
-        // e.g. shm_open("/radar_shared_mem", O_RDONLY, 0666);
-        // COEN320 Task 3.3
-		// Map the shared memory object into the process's address space
-        // The shared memory should be mapped to "shared_mem" (check for errors)
-
-		 // COEN320 Task 3.2
-		// Attempt to open the shared memory object (You need to use the same name as Task 2 in Radar)
-		shm_fd = shm_open("/tmp/AH_40247851_40228573_Radar_shm", O_RDONLY, 0666);
-
-		if (shm_fd == -1) {
-			std::cerr << "Failed to open shared memory, retrying..." << std::endl;
-			sleep(1);  // Wait before retrying to give radar time to create if needed
-			continue;
-		}
-
-		// COEN320 Task 3.3
-		// Map the shared memory object into the process's address space
-		shared_mem = (SharedMemory*)mmap(NULL, sizeof(SharedMemory), PROT_READ, MAP_SHARED, shm_fd, 0);
-
-		if (shared_mem == MAP_FAILED) {
-			std::cerr << "Failed to map shared memory, retrying..." << std::endl;
-			close(shm_fd);
-			shm_fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		//std::cout << "Shared memory initialized successfully" << std::endl;
-		return true;
-
-	}
-}
-
-void ComputerSystem::cleanupSharedMemory() {
-    if (shared_mem && shared_mem != MAP_FAILED) {
-        munmap(shared_mem, sizeof(SharedMemory));
-    }
-    if (shm_fd != -1) {
-        close(shm_fd);
+CommunicationsSystem::~CommunicationsSystem() {
+    if (Communications_System.joinable()) {
+        Communications_System.join();
     }
 }
 
-bool ComputerSystem::startMonitoring() {
-    if (initializeSharedMemory()) {
-        running = true; // will be used in monitorAirspace
-        //std::cout << "Starting monitoring thread." << std::endl;
-        monitorThread = std::thread(&ComputerSystem::monitorAirspace, this);
-        return true;
-    } else {
-        std::cerr << "Failed to initialize shared memory. Monitoring not started.\n";
-        return false;
+void CommunicationsSystem::HandleCommunications() {
+   // std::cout << "Communications System started\n";
+
+    // Create channel for receiving commands from Operator Console
+    name_attach_t* comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
+
+    if (comms_channel == NULL) {
+        std::cerr << "Failed to create Communications System channel\n";
+        return;
     }
-}
 
-void ComputerSystem::joinThread() {
-    if (monitorThread.joinable()) {
-        monitorThread.join();
-    }
-}
+    //std::cout << "Communications System listening on channel: " << COMMS_CHANNEL_NAME << "\n";
 
-void ComputerSystem::monitorAirspace() {
-	//std::cout << "Initial is_empty value: " << shared_mem->is_empty.load() << std::endl;
-	ATCTimer timer(1,0);
-	// Vector to store plane data
-	std::vector<msg_plane_info> plane_data_vector;
-	uint64_t timestamp;
-    // Keep monitoring indefinitely until `stopMonitoring` is called
-	while (shared_mem->is_empty.load()) {
-		std::cout << "Waiting for planes in airspace...\n";
-		timer.waitTimer();
-	}
+    while (true) {
+        // Receive Message_inter_process (not Message)
+        Message_inter_process msg;
+        memset(&msg, 0, sizeof(msg));  // Clear the buffer before receiving
 
-	while (running) {
-		if (shared_mem->is_empty.load()) {
-			std::cout << "No planes in airspace. Stopping monitoring.\n";
-			running = false;
-	        break;
-        } else {
-        	plane_data_vector.clear();
+        int rcvid = MsgReceive(comms_channel->chid, &msg, sizeof(msg), NULL);
 
-            timestamp = shared_mem->timestamp;
-            //std::cout << "Last Update Timestamp: " << timestamp << "\n";
-            //std::cout << "Number of planes in shared memory: " << shared_mem->count << "\n";
-
-            for (int i = 0; i < shared_mem->count; ++i) {
-            	const msg_plane_info& plane = shared_mem->plane_data[i];
-            	// Store the plane info in the vector
-            	plane_data_vector.push_back(plane);
-            }
+        if (rcvid == -1) {
+            std::cerr << "Error receiving message: " << strerror(errno) << "\n";
+            continue;  // Error receiving message
         }
 
-		if (plane_data_vector.size()>1)
-            checkCollision(timestamp, plane_data_vector);
-		else
-           // std::cout << "No collision possible with single plane\n";
-        // Sleep for a short interval before the next poll
-       timer.waitTimer();
-    }
-	std::cout << "Exiting monitoring loop." << std::endl;
-}
+        // Skip pulses (rcvid == 0)
+        if (rcvid == 0) {
+            continue;
+        }
 
-void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_info> planes) {
-   // std::cout << "Checking for collisions at time: " << currentTime << std::endl;
-    // COEN320 Task 3.4
-    // detect collisions between planes in the airspace within the time constraint
-    // You need to Iterate through each pair of planes and in case of collision,
-    // store the pair of plane IDs that are predicted to collide
-    // You can use the function checkAxes provided below to check if two planes will collide
-    // COEN320 Task 3.5
-    // in case of collision, send message to Display system
-    /*
-    HINT:
-    In case of collision a Message (type Message_inter_process) should be sent to the Display system
-    The data field of the message should contain the list of pairs of plane IDs that are predicted to collide
-    Make sure to fill dataSize field of the message appropriately
-    e.g. (here a std::pair<int,int> is used to represent a pair of colliding planes)
-    // Prepare the message
-    Message_inter_process msg_to_send;
-    std::vector<std::pair<int, int>> collisionPairs;
-    // Store the collision pair plane ID 0 and 1
-    collisionPairs.emplace_back(<plane 0>, <plane 1>);
-    // Serialize collisionPairs
-    size_t numPairs = collisionPairs.size();
-    size_t dataSize = numPairs * sizeof(std::pair<int, int>);
+        // Check if this is an inter-process message
+        if (!msg.header) {
+            MsgReply(rcvid, 0, NULL, 0);
+            continue;
+        }
 
-    msg_to_send.planeID = -1;
-    msg_to_send.type = MessageType::COLLISION_DETECTED;
-    msg_to_send.dataSize = dataSize;
-    std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
-    sendCollisionToDisplay(msg_to_send);
+        // Debug
+        std::cout << "Communications System received message:\n";
+        std::cout << "  Plane ID: " << msg.planeID << "\n";
+        std::cout << "  Type: " << static_cast<int>(msg.type) << "\n";
+        std::cout << "  Data Size: " << msg.dataSize << "\n";
 
-    */
+        // Reply to acknowledge receipt before forwarding so that we allow the operator console to continue
+        int reply = 0;
+        MsgReply(rcvid, 0, &reply, sizeof(reply));
 
-    std::vector<std::pair<int, int>> collisionPairs;
+        // Process the message based on type
+        switch (msg.type) {
+            case MessageType::REQUEST_CHANGE_OF_HEADING:
+                std::cout << "Forwarding heading change request to Plane " << msg.planeID << "\n";
+                messageAircraft(msg);
+                break;
 
-    for (size_t i = 0; i < planes.size(); i++) {
-    	for (size_t j = i + 1; j < planes.size(); j++) {
-    		// Check if planes will collide
-    		if (checkAxes(planes[i], planes[j])) {
-    			std::cout << "DEBUG: Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
-    			collisionPairs.emplace_back(planes[i].id, planes[j].id);
-    		}
-    	}
-    }
+            case MessageType::REQUEST_CHANGE_POSITION:
+                std::cout << "Forwarding position change request to Plane " << msg.planeID << "\n";
+                messageAircraft(msg);
+                break;
 
-    std::cout << "DEBUG: Total collision pairs this cycle: " << collisionPairs.size() << std::endl;
+            case MessageType::REQUEST_CHANGE_ALTITUDE:
+                std::cout << "Forwarding altitude change request to Plane " << msg.planeID << "\n";
+                messageAircraft(msg);
+                break;
 
-    // COEN320 Task 3.5
-    // In the case of collision send message to Display system
-    if (!collisionPairs.empty()) {
+            case MessageType::EXIT:
+                std::cout << "Exit command received\n";
+                name_detach(comms_channel, 0);
+                return;
 
-    	Message_inter_process msg_to_send;
-
-    	size_t numPairs = collisionPairs.size();
-    	size_t dataSize = numPairs * sizeof(std::pair<int, int>);
-
-    	msg_to_send.header = true;  // Inter-process message
-    	msg_to_send.planeID = -1;
-    	msg_to_send.type = MessageType::COLLISION_DETECTED;
-    	msg_to_send.dataSize = dataSize;
-    	std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
-
-    	sendCollisionToDisplay(msg_to_send);
-    	std::cout << "DEBUG: Sent collision message to Display with " << numPairs << " pairs" << std::endl;
-    } else {
-    	std::cout << "DEBUG: No collisions this cycle" << std::endl;
-    }
-    
-}
-
-bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
-    // Calculate current distance between planes
-    double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
-    double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
-    double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
-
-    // DEBUG: Print distances for every pair
-    std::cout << "DEBUG checkAxes: Planes " << plane1.id << " & " << plane2.id 
-              << " - Delta X:" << deltaX << " Y:" << deltaY << " Z:" << deltaZ 
-              << " (Constraints: " << CONSTRAINT_X << ", " << CONSTRAINT_Y << ", " << CONSTRAINT_Z << ")" << std::endl;
-
-    // Check if planes are currently too close - this is a collision NOW
-    if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
-        std::cout << "DEBUG: Current distance collision! Planes " << plane1.id << " & " << plane2.id << std::endl;
-        return true;
-    }
-
-    // Calculate relative velocities (velocity of plane1 in plane2's reference frame)
-    double relativeVelX = plane1.VelocityX - plane2.VelocityX;
-    double relativeVelY = plane1.VelocityY - plane2.VelocityY;
-    double relativeVelZ = plane1.VelocityZ - plane2.VelocityZ;
-
-    // Calculate relative positions (position of plane1 relative to plane2)
-    double relativeX = plane1.PositionX - plane2.PositionX;
-    double relativeY = plane1.PositionY - plane2.PositionY;
-    double relativeZ = plane1.PositionZ - plane2.PositionZ;
-
-    // Check collision at smaller time intervals (0.5 second steps) for better accuracy
-    double timeStep = 0.5;
-    int numSteps = static_cast<int>(timeConstraintCollisionFreq / timeStep);
-    
-    for (int i = 1; i <= numSteps; i++) {
-        double t = i * timeStep;
-        
-        // Calculate future relative positions
-        double futureRelX = relativeX + relativeVelX * t;
-        double futureRelY = relativeY + relativeVelY * t;
-        double futureRelZ = relativeZ + relativeVelZ * t;
-
-        // Check if relative distance is within collision constraints
-        if (std::abs(futureRelX) < CONSTRAINT_X && 
-            std::abs(futureRelY) < CONSTRAINT_Y && 
-            std::abs(futureRelZ) < CONSTRAINT_Z) {
-            std::cout << "DEBUG: Future collision at t=" << t << "s! Planes " << plane1.id << " & " << plane2.id << std::endl;
-            return true;
+            default:
+                std::cerr << "Unknown message type received: " << static_cast<int>(msg.type) << "\n";
+                break;
         }
     }
 
-    return false;
+    name_detach(comms_channel, 0);
 }
 
+void CommunicationsSystem::messageAircraft(const Message_inter_process& msg) {
+    // Open channel to the specific aircraft
+    std::string plane_channel_name = "AH_40247851_40228573_" + std::to_string(msg.planeID);
+    int plane_channel = name_open(plane_channel_name.c_str(), 0);
 
-void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
-	int display_channel = name_open(display_channel_name, 0);
-	if (display_channel == -1) {
-		throw std::runtime_error("Computer system: Error occurred while attaching to display");
-	}
-	int reply;
+    if (plane_channel == -1) {
+        std::cerr << "Failed to open channel to Plane " << msg.planeID << " (" << plane_channel_name << ")\n";
+        std::cerr << "  Error: " << strerror(errno) << "\n";
+        std::cerr << "  Plane may have left airspace or channel doesn't exist yet\n";
+        return;
+    }
 
-	int status = MsgSend(display_channel, &msg, sizeof(msg), &reply, sizeof(reply));
-	if (status == -1) {
-		perror("Computer system: Error occurred while sending message to display channel");
-	}
-	name_close(display_channel);
+    std::cout << "Successfully opened channel to Plane " << msg.planeID << "\n";
+
+    // Send the Message_inter_process directly to the aircraft
+    int reply;
+    if (MsgSend(plane_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
+        std::cerr << "Failed to send message to Plane " << msg.planeID << "\n";
+        std::cerr << "  Error: " << strerror(errno) << "\n";
+    } else {
+        std::cout << "Successfully sent command to Plane " << msg.planeID << "\n";
+    }
+
+    name_close(plane_channel);
 }
