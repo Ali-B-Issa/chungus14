@@ -11,11 +11,14 @@
 #define display_channel_name "40247851_40228573_Display"
 
 
-ComputerSystem::ComputerSystem() : shm_fd(-1), shared_mem(nullptr), running(false) {}
+ComputerSystem::ComputerSystem() : shm_fd(-1), shared_mem(nullptr), running(false), display_channel(-1) {}
 
 ComputerSystem::~ComputerSystem() {
     joinThread();
     cleanupSharedMemory();
+    if (display_channel != -1) {
+        name_close(display_channel);
+    }
 }
 
 bool ComputerSystem::initializeSharedMemory() {
@@ -68,6 +71,13 @@ void ComputerSystem::cleanupSharedMemory() {
 
 bool ComputerSystem::startMonitoring() {
     if (initializeSharedMemory()) {
+        // Open display channel once at startup
+        display_channel = name_open(display_channel_name, 0);
+        if (display_channel == -1) {
+            std::cerr << "Failed to open display channel" << std::endl;
+            return false;
+        }
+        
         running = true; // will be used in monitorAirspace
         //std::cout << "Starting monitoring thread." << std::endl;
         monitorThread = std::thread(&ComputerSystem::monitorAirspace, this);
@@ -163,13 +173,10 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	for (size_t j = i + 1; j < planes.size(); j++) {
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
-    			std::cout << "DEBUG: Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
     			collisionPairs.emplace_back(planes[i].id, planes[j].id);
     		}
     	}
     }
-
-    std::cout << "DEBUG: Total collision pairs this cycle: " << collisionPairs.size() << std::endl;
 
     // COEN320 Task 3.5
     // In the case of collision send message to Display system
@@ -187,9 +194,6 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
 
     	sendCollisionToDisplay(msg_to_send);
-    	std::cout << "DEBUG: Sent collision message to Display with " << numPairs << " pairs" << std::endl;
-    } else {
-    	std::cout << "DEBUG: No collisions this cycle" << std::endl;
     }
     
 }
@@ -200,14 +204,8 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
     double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
 
-    // DEBUG: Print distances for every pair
-    std::cout << "DEBUG checkAxes: Planes " << plane1.id << " & " << plane2.id 
-              << " - Delta X:" << deltaX << " Y:" << deltaY << " Z:" << deltaZ 
-              << " (Constraints: " << CONSTRAINT_X << ", " << CONSTRAINT_Y << ", " << CONSTRAINT_Z << ")" << std::endl;
-
     // Check if planes are currently too close - this is a collision NOW
     if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
-        std::cout << "DEBUG: Current distance collision! Planes " << plane1.id << " & " << plane2.id << std::endl;
         return true;
     }
 
@@ -237,7 +235,6 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
         if (std::abs(futureRelX) < CONSTRAINT_X && 
             std::abs(futureRelY) < CONSTRAINT_Y && 
             std::abs(futureRelZ) < CONSTRAINT_Z) {
-            std::cout << "DEBUG: Future collision at t=" << t << "s! Planes " << plane1.id << " & " << plane2.id << std::endl;
             return true;
         }
     }
@@ -247,15 +244,15 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
 
 
 void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
-	int display_channel = name_open(display_channel_name, 0);
+    // Use the already-open channel instead of opening/closing every time
 	if (display_channel == -1) {
-		throw std::runtime_error("Computer system: Error occurred while attaching to display");
+		std::cerr << "Computer system: Display channel not open" << std::endl;
+        return;
 	}
+	
 	int reply;
-
 	int status = MsgSend(display_channel, &msg, sizeof(msg), &reply, sizeof(reply));
 	if (status == -1) {
 		perror("Computer system: Error occurred while sending message to display channel");
 	}
-	name_close(display_channel);
 }
