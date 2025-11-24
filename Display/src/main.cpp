@@ -5,7 +5,7 @@
 // Global display pointer for signal handling
 Display* g_display = nullptr;
 
-// Signal handler for clean shutdown (Ctrl+C)
+// Signal handler for shutdown (Ctrl+C)
 void signalHandler(int signum) {
     std::cout << "\nDisplay: Received signal " << signum << ", shutting down...\n";
     if (g_display) {
@@ -40,5 +40,6 @@ int main() {
 
     return EXIT_SUCCESS;
 }
+
 
 
