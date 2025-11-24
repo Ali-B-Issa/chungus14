@@ -200,8 +200,14 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
     double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
 
+    // DEBUG: Print distances for every pair
+    std::cout << "DEBUG checkAxes: Planes " << plane1.id << " & " << plane2.id 
+              << " - Delta X:" << deltaX << " Y:" << deltaY << " Z:" << deltaZ 
+              << " (Constraints: " << CONSTRAINT_X << ", " << CONSTRAINT_Y << ", " << CONSTRAINT_Z << ")" << std::endl;
+
     // Check if planes are currently too close - this is a collision NOW
     if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
+        std::cout << "DEBUG: Current distance collision! Planes " << plane1.id << " & " << plane2.id << std::endl;
         return true;
     }
 
@@ -231,6 +237,7 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
         if (std::abs(futureRelX) < CONSTRAINT_X && 
             std::abs(futureRelY) < CONSTRAINT_Y && 
             std::abs(futureRelZ) < CONSTRAINT_Z) {
+            std::cout << "DEBUG: Future collision at t=" << t << "s! Planes " << plane1.id << " & " << plane2.id << std::endl;
             return true;
         }
     }
