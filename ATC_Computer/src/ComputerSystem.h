@@ -43,8 +43,6 @@ private:
 
     int timeConstraintCollisionFreq = 180;
 
-
-
     int shm_fd;
     SharedMemory* shared_mem;
     std::thread monitorThread;
@@ -52,6 +50,9 @@ private:
     std::atomic<bool> running;
 
     bool listen = true;
+    
+    // Keep display channel open for the lifetime of the object
+    int display_channel;
 };
 
 #endif // COMPUTER_SYSTEM_H
