@@ -50,6 +50,7 @@ void Aircraft::printInitialAircraftData() const {
 
 
 void Aircraft::changeHeading(double Vx, double Vy, double Vz){
+	// FIXED: Original code had bugs checking Vx three times
 	if (Vx != 0) speedX = Vx;
 	if (Vy != 0) speedY = Vy;
 	if (Vz != 0) speedZ = Vz;
@@ -120,8 +121,8 @@ int Aircraft::updatePosition() {
         posY += speedY;
         posZ += speedZ;
 
-        // Debug: Print the new position
-      /*  if (id == 2){// printing the change for only specific planes change as needed
+        // Debug: Print the new position choose which plane by changing the id
+       /* if (id == 2){
         std::cout << "Updated Position: (" << posX << ", " << posY << ", " << posZ << ")\n";
         }*/
         // Check if the plane is still within airspace boundaries
@@ -143,27 +144,25 @@ int Aircraft::updatePosition() {
         int rcvid = MsgReceive(Plane_channel->chid, buffer, sizeof(buffer), NULL);
 
         if (rcvid != -1) {
-            // Determine message type by checking the MessageType field
-            // Cast to base Message to peek at the type
+            // Determine message type by checking the MessageType field and recast
             Message* baseMsg = reinterpret_cast<Message*>(buffer);
 
-            // First check if this looks like a valid message type
             MessageType msgType = baseMsg->type;
             int typeValue = static_cast<int>(msgType);
 
-            // Valid MessageType enum values are 0-10
-            // If we get garbage data (like 223), it's from Radar which doesn't properly initialize all fields
+            // Valid MessageType enum values are 0-10 so anyhting else is an error
+            // If we get  data (like 223) it's from Radar which doesn't properly connect it means
             // REQUEST_POSITION (3) is always from Radar
-            // Types 4-10 are from Communications System (operator commands)
+            // Types 4-10 are from Communications System and are our operator commands we input
             bool isValidType = (typeValue >= 0 && typeValue <= 10);
             bool isInterProcess = isValidType && (msgType != MessageType::REQUEST_POSITION);
 
-            // Radar requested position data
-            if (isInterProcess){  //sporadic - from Communications System
-            	// Message is of type Message_inter_process
+
+            if (isInterProcess){  // if its from Communications System
+            	// Recast it to be of type Message_inter_process
             	Message_inter_process* receivedMsg = reinterpret_cast<Message_inter_process*>(buffer);
 
-            	// Debug output
+            	// Debug
             	std::cout << "Aircraft " << id << " received inter-process message, type: "
             	          << static_cast<int>(receivedMsg->type) << "\n";
 
@@ -217,15 +216,14 @@ int Aircraft::updatePosition() {
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
                     }
-
+                    // if this is printed out its usually because communications system channel didn't send properly,
                     default:
-                        std::cerr << "Aircraft " << id << " received unknown inter-process message type: "
-                                  << static_cast<int>(receivedMsg->type) << "\n";
+                        std::cerr << "Aircraft " << id << " received unknown inter-process message type: " << static_cast<int>(receivedMsg->type) << "\n";
                         MsgReply(rcvid, -1, NULL, 0);
                         break;
                 }
-            } else {  //periodic - from Radar
-            	// Message is of type Message
+            } else {  // from Radar
+            	// Message is recast to type Message
             	Message* receivedMsg = reinterpret_cast<Message*>(buffer);
 
             	if (receivedMsg->type == MessageType::REQUEST_POSITION) {
