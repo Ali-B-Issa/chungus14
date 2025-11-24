@@ -191,50 +191,42 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
 }
 
 bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
-    // COEN320 Task 3.4
-    // A collision is defined as two planes entering the defined airspace constraints within the time constraint
-    // You need to implement the logic to check if plane1 and plane2 will collide within the time constraint
-    // Return true if they will collide, false otherwise
-    // A simple approach is to just check if their positions will be within the defined constraints (e.g., CONSTRAINT_X, CONSTRAINT_Y, CONSTRAINT_Z)
-    // A more accurate approach would involve calculating their future positions based on their velocities
-    // and checking if those future positions will be within the defined constraints within the time constraint
-	// COEN320 Task 3.4
-	    // A collision is defined as two planes entering the defined airspace constraints within the time constraint
+    // Calculate current distance between planes
+    double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
+    double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
+    double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
 
-	    // Calculate the distance between the two planes in each axis
-	    double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
-	    double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
-	    double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
+    // Check if planes are currently too close
+    if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
+        return true;
+    }
 
-	    // Check if the planes are within the constraint distances
-	    if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
-	        // Planes are too close - collision detected
+    // Calculate relative velocities
+    double relativeVelX = plane1.VelocityX - plane2.VelocityX;
+    double relativeVelY = plane1.VelocityY - plane2.VelocityY;
+    double relativeVelZ = plane1.VelocityZ - plane2.VelocityZ;
 
-    return true; // Placeholder return value; replace with actual collision detection logic
-	    }
+    // Calculate relative positions
+    double relativeX = plane1.PositionX - plane2.PositionX;
+    double relativeY = plane1.PositionY - plane2.PositionY;
+    double relativeZ = plane1.PositionZ - plane2.PositionZ;
 
+    // Check collision at multiple time steps using relative motion
+    for (int t = 1; t <= timeConstraintCollisionFreq; t++) {
+        // Calculate future relative positions
+        double futureRelX = relativeX + relativeVelX * t;
+        double futureRelY = relativeY + relativeVelY * t;
+        double futureRelZ = relativeZ + relativeVelZ * t;
 
-//fix to make work with relative position
+        // Check if relative distance is within collision constraints
+        if (std::abs(futureRelX) < CONSTRAINT_X && 
+            std::abs(futureRelY) < CONSTRAINT_Y && 
+            std::abs(futureRelZ) < CONSTRAINT_Z) {
+            return true;
+        }
+    }
 
-	        // Predict positions after time constraint
-	        double futureX1 = plane1.PositionX + plane1.VelocityX * timeConstraintCollisionFreq;
-	        double futureY1 = plane1.PositionY + plane1.VelocityY * timeConstraintCollisionFreq;
-	        double futureZ1 = plane1.PositionZ + plane1.VelocityZ * timeConstraintCollisionFreq;
-
-	        double futureX2 = plane2.PositionX + plane2.VelocityX * timeConstraintCollisionFreq;
-	        double futureY2 = plane2.PositionY + plane2.VelocityY * timeConstraintCollisionFreq;
-	        double futureZ2 = plane2.PositionZ + plane2.VelocityZ * timeConstraintCollisionFreq;
-
-	        // Check if future positions will be within constraints
-	        double futureDeltaX = std::abs(futureX1 - futureX2);
-	        double futureDeltaY = std::abs(futureY1 - futureY2);
-	        double futureDeltaZ = std::abs(futureZ1 - futureZ2);
-
-	        if (futureDeltaX < CONSTRAINT_X && futureDeltaY < CONSTRAINT_Y && futureDeltaZ < CONSTRAINT_Z) {
-	            return true;
-	        }
-
-	        return false;
+    return false;
 }
 
 
