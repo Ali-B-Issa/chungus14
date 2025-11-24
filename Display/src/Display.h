@@ -17,10 +17,10 @@
 #include <errno.h>
 #include "Msg_structs.h"
 
-// Display channel name 
+// Display channel name
 #define DISPLAY_CHANNEL_NAME "40247851_40228573_Display"
 
-// Shared memory name 
+// Shared memory name
 #define SHARED_MEMORY_NAME "/tmp/AH_40247851_40228573_Radar_shm"
 
 class Display {
@@ -58,28 +58,21 @@ private:
     std::mutex collisionMutex;
     uint64_t lastCollisionTime;  // Timestamp of last collision message
 
-    // Initialization methods
+
     bool initializeSharedMemory();
     bool initializeIPCChannel();
 
-    // Cleanup methods
+
     void cleanupSharedMemory();
     void cleanupIPCChannel();
 
-    // Thread functions
+
     void displayAircraft();          // Periodically display aircraft positions
     void listenForCollisions();      // Listen for collision messages from ComputerSystem
 
-    // Display helper methods
-    void printAirspaceGrid(const std::vector<msg_plane_info>& planes);
-    void printCollisionWarning(int planeA, int planeB);
-    void clearScreen();
 
-    // Grid conversion helpers
-    int airspaceToGridX(double x);   // Convert airspace X to grid column
-    int airspaceToGridY(double y);   // Convert airspace Y to grid row
-    char getDirectionArrow(double vx, double vy);  // Get arrow based on velocity
+    void printAirspaceGrid(const std::vector<msg_plane_info>& planes);
+
 };
 
 #endif /* DISPLAY_H_ */
-
