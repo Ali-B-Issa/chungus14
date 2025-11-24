@@ -15,7 +15,7 @@ void signalHandler(int signum) {
 
 int main() {
     
-    // Set up signal handlers for clean shutdown
+    // Set up signal handlers for  shutdown
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
@@ -40,4 +40,5 @@ int main() {
 
     return EXIT_SUCCESS;
 }
+
 
