@@ -28,13 +28,14 @@ bool ComputerSystem::initializeSharedMemory() {
         // COEN320 Task 3.3
 		// Map the shared memory object into the process's address space
         // The shared memory should be mapped to "shared_mem" (check for errors)
+
 		 // COEN320 Task 3.2
 		// Attempt to open the shared memory object (You need to use the same name as Task 2 in Radar)
 		shm_fd = shm_open("/tmp/AH_40247851_40228573_Radar_shm", O_RDONLY, 0666);
 
 		if (shm_fd == -1) {
 			std::cerr << "Failed to open shared memory, retrying..." << std::endl;
-			sleep(1);  // Wait before retrying
+			sleep(1);  // Wait before retrying to give radar time to create if needed
 			continue;
 		}
 
@@ -50,7 +51,7 @@ bool ComputerSystem::initializeSharedMemory() {
 			continue;
 		}
 
-		//std::cout << "Shared memory initialized successfully." << std::endl;
+		//std::cout << "Shared memory initialized successfully" << std::endl;
 		return true;
 
 	}
@@ -102,10 +103,7 @@ void ComputerSystem::monitorAirspace() {
 	        break;
         } else {
         	plane_data_vector.clear();
-        	// Print separator and timestamp
-            //std::cout << "\n================= Shared Memory Update =================\n";
 
-            // Display the timestamp in a readable format
             timestamp = shared_mem->timestamp;
             //std::cout << "Last Update Timestamp: " << timestamp << "\n";
             //std::cout << "Number of planes in shared memory: " << shared_mem->count << "\n";
@@ -116,11 +114,11 @@ void ComputerSystem::monitorAirspace() {
             	plane_data_vector.push_back(plane);
             }
         }
-		//**************Call Collision Detector*********************
+
 		if (plane_data_vector.size()>1)
             checkCollision(timestamp, plane_data_vector);
 		else
-            std::cout << "No collision possible with single plane\n";
+           // std::cout << "No collision possible with single plane\n";
         // Sleep for a short interval before the next poll
        timer.waitTimer();
     }
@@ -128,7 +126,7 @@ void ComputerSystem::monitorAirspace() {
 }
 
 void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_info> planes) {
-    std::cout << "Checking for collisions at time: " << currentTime << std::endl;
+   // std::cout << "Checking for collisions at time: " << currentTime << std::endl;
     // COEN320 Task 3.4
     // detect collisions between planes in the airspace within the time constraint
     // You need to Iterate through each pair of planes and in case of collision,
@@ -158,29 +156,26 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     sendCollisionToDisplay(msg_to_send);
 
     */
-    // detect collisions between planes in the airspace within the time constraint
 
     std::vector<std::pair<int, int>> collisionPairs;
 
-    // Iterate through each pair of planes
     for (size_t i = 0; i < planes.size(); i++) {
     	for (size_t j = i + 1; j < planes.size(); j++) {
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
-    			std::cout << "Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
-    			// Store the collision pair
+    			//std::cout << "Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
+
     			collisionPairs.emplace_back(planes[i].id, planes[j].id);
     		}
     	}
     }
 
     // COEN320 Task 3.5
-    // in case of collision, send message to Display system
+    // In the case of collision send message to Display system
     if (!collisionPairs.empty()) {
-    	// Prepare the message
+
     	Message_inter_process msg_to_send;
 
-    	// Serialize collisionPairs
     	size_t numPairs = collisionPairs.size();
     	size_t dataSize = numPairs * sizeof(std::pair<int, int>);
 
@@ -217,13 +212,11 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
 
     return true; // Placeholder return value; replace with actual collision detection logic
 	    }
-	  // Check future positions based on velocities within time constraint
-	        // Calculate relative velocity
-	        double relVelX = plane1.VelocityX - plane2.VelocityX;
-	        double relVelY = plane1.VelocityY - plane2.VelocityY;
-	        double relVelZ = plane1.VelocityZ - plane2.VelocityZ;
 
-	        // Predict positions after time constraint (e.g., 180 seconds)
+
+//fix to make work with relative position
+
+	        // Predict positions after time constraint
 	        double futureX1 = plane1.PositionX + plane1.VelocityX * timeConstraintCollisionFreq;
 	        double futureY1 = plane1.PositionY + plane1.VelocityY * timeConstraintCollisionFreq;
 	        double futureZ1 = plane1.PositionZ + plane1.VelocityZ * timeConstraintCollisionFreq;
