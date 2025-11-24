@@ -14,12 +14,7 @@ void signalHandler(int signum) {
 }
 
 int main() {
-    std::cout << "╔════════════════════════════════════════════╗\n";
-    std::cout << "║      ATC Display System Starting...        ║\n";
-    std::cout << "║      Group: AH_40247851_40228573           ║\n";
-    std::cout << "║      COEN320 - Lab 4/5                     ║\n";
-    std::cout << "╚════════════════════════════════════════════╝\n\n";
-
+    
     // Set up signal handlers for clean shutdown
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
@@ -45,3 +40,4 @@ int main() {
 
     return EXIT_SUCCESS;
 }
+
