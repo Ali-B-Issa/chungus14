@@ -6,11 +6,9 @@
 #include <sys/dispatch.h>
 #include <cstring> // For memcpy
 
-// COEN320 Task 4: Define the communications system channel name
 #define COMMS_CHANNEL_NAME "AH_40247851_40228573_Comms"
 
 CommunicationsSystem::CommunicationsSystem() {
-    // Start the communications handling thread
     Communications_System = std::thread(&CommunicationsSystem::HandleCommunications, this);
 }
 
@@ -23,7 +21,6 @@ CommunicationsSystem::~CommunicationsSystem() {
 void CommunicationsSystem::HandleCommunications() {
    // std::cout << "Communications System started\n";
 
-    // Create channel for receiving commands from Operator Console
     name_attach_t* comms_channel = name_attach(NULL, COMMS_CHANNEL_NAME, 0);
 
     if (comms_channel == NULL) {
@@ -34,7 +31,7 @@ void CommunicationsSystem::HandleCommunications() {
     //std::cout << "Communications System listening on channel: " << COMMS_CHANNEL_NAME << "\n";
 
     while (true) {
-        // Receive Message_inter_process (not Message)
+        // Receive Message_inter_process
         Message_inter_process msg;
         memset(&msg, 0, sizeof(msg));  // Clear the buffer before receiving
 
@@ -42,10 +39,10 @@ void CommunicationsSystem::HandleCommunications() {
 
         if (rcvid == -1) {
             std::cerr << "Error receiving message: " << strerror(errno) << "\n";
-            continue;  // Error receiving message
+            continue;
         }
 
-        // Skip pulses (rcvid == 0)
+        // Skip pulses
         if (rcvid == 0) {
             continue;
         }
