@@ -28,44 +28,46 @@ public:
     Display();
     ~Display();
 
+
     bool initialize();
     void run();
     void shutdown();
 
 private:
-    // Shared memory
+
     int shm_fd;
     SharedMemory* shared_mem;
 
-    // IPC channel
     name_attach_t* display_channel;
 
-    // Threads
+
     std::thread displayThread;
     std::thread collisionListenerThread;
 
     std::atomic<bool> running;
 
-    // Collision tracking - stores ALL active collisions
-    std::set<int> planesInCollision;                    // Set of plane IDs involved in any collision
-    std::vector<std::pair<int, int>> collisionPairs;   // All active collision pairs
-    std::mutex collisionMutex;                         // Protects collision data structures
-    uint64_t lastCollisionTime;                        // Timestamp of most recent collision update
+    std::set<int> planesInCollision;
+    std::vector<std::pair<int, int>> collisionPairs;
+    std::mutex collisionMutex;
+    uint64_t lastCollisionTime;
 
-    // Initialization methods
+
     bool initializeSharedMemory();
     bool initializeIPCChannel();
 
-    // Cleanup methods
+
     void cleanupSharedMemory();
     void cleanupIPCChannel();
 
-    // Worker threads
+
     void displayAircraft();
     void listenForCollisions();
 
-    // Display helper
+
     void printAirspaceGrid(const std::vector<msg_plane_info>& planes);
+    void clearScreen();
+
+
 };
 
 #endif /* DISPLAY_H_ */
