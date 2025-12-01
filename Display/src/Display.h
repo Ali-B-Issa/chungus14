@@ -6,7 +6,6 @@
 #include <atomic>
 #include <vector>
 #include <set>
-#include <map>
 #include <mutex>
 #include <utility>
 #include <fcntl.h>
@@ -29,50 +28,44 @@ public:
     Display();
     ~Display();
 
-    // Initialize shared memory and IPC channel
     bool initialize();
-
-    // Run the display (blocks until shutdown)
     void run();
-
-    // Shutdown the display system
     void shutdown();
 
 private:
-    // Shared memory for reading radar data
+    // Shared memory
     int shm_fd;
     SharedMemory* shared_mem;
 
-    // IPC channel for collision notifications from ComputerSystem
+    // IPC channel
     name_attach_t* display_channel;
 
     // Threads
-    std::thread displayThread;           // Thread for displaying aircraft
-    std::thread collisionListenerThread; // Thread for listening to collisions
+    std::thread displayThread;
+    std::thread collisionListenerThread;
 
-    // Control flags
     std::atomic<bool> running;
 
-    // Track planes involved in collisions - maps plane ID to set of planes it collides with
-    std::map<int, std::set<int>> planeCollisions;
-    std::mutex collisionMutex;
-    uint64_t lastCollisionTime;  // Timestamp of last collision message
+    // Collision tracking - stores ALL active collisions
+    std::set<int> planesInCollision;                    // Set of plane IDs involved in any collision
+    std::vector<std::pair<int, int>> collisionPairs;   // All active collision pairs
+    std::mutex collisionMutex;                         // Protects collision data structures
+    uint64_t lastCollisionTime;                        // Timestamp of most recent collision update
 
-
+    // Initialization methods
     bool initializeSharedMemory();
     bool initializeIPCChannel();
 
-
+    // Cleanup methods
     void cleanupSharedMemory();
     void cleanupIPCChannel();
 
+    // Worker threads
+    void displayAircraft();
+    void listenForCollisions();
 
-    void displayAircraft();          // Periodically display aircraft positions
-    void listenForCollisions();      // Listen for collision messages from ComputerSystem
-
-
+    // Display helper
     void printAirspaceGrid(const std::vector<msg_plane_info>& planes);
-
 };
 
 #endif /* DISPLAY_H_ */
