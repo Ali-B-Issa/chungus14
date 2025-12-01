@@ -134,38 +134,30 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     // You can use the function checkAxes provided below to check if two planes will collide
     // COEN320 Task 3.5
     // in case of collision, send message to Display system
-    /*
-    HINT:
-    In case of collision a Message (type Message_inter_process) should be sent to the Display system
-    The data field of the message should contain the list of pairs of plane IDs that are predicted to collide
-    Make sure to fill dataSize field of the message appropriately
-    e.g. (here a std::pair<int,int> is used to represent a pair of colliding planes)
-    // Prepare the message
-    Message_inter_process msg_to_send;
-    std::vector<std::pair<int, int>> collisionPairs;
-    // Store the collision pair plane ID 0 and 1
-    collisionPairs.emplace_back(<plane 0>, <plane 1>);
-    // Serialize collisionPairs
-    size_t numPairs = collisionPairs.size();
-    size_t dataSize = numPairs * sizeof(std::pair<int, int>);
-
-    msg_to_send.planeID = -1;
-    msg_to_send.type = MessageType::COLLISION_DETECTED;
-    msg_to_send.dataSize = dataSize;
-    std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
-    sendCollisionToDisplay(msg_to_send);
-
-    */
 
     std::vector<std::pair<int, int>> collisionPairs;
 
+    // **FIX: Check ALL pairs of planes, not just adjacent ones**
     for (size_t i = 0; i < planes.size(); i++) {
     	for (size_t j = i + 1; j < planes.size(); j++) {
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
-    			//std::cout << "Collision detected between Plane " << planes[i].id << " and Plane " << planes[j].id << std::endl;
-
-    			collisionPairs.emplace_back(planes[i].id, planes[j].id);
+    			// Only add unique pairs
+    			bool isDuplicate = false;
+    			for (const auto& pair : collisionPairs) {
+    				if ((pair.first == planes[i].id && pair.second == planes[j].id) ||
+    					(pair.first == planes[j].id && pair.second == planes[i].id)) {
+    					isDuplicate = true;
+    					break;
+    				}
+    			}
+    			
+    			if (!isDuplicate) {
+    				collisionPairs.emplace_back(planes[i].id, planes[j].id);
+    				// Debug output to see which collisions are detected
+    				//std::cout << "*** Collision detected between Plane " << planes[i].id 
+    				//          << " and Plane " << planes[j].id << " ***\n";
+    			}
     		}
     	}
     }
@@ -195,46 +187,41 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     // A collision is defined as two planes entering the defined airspace constraints within the time constraint
     // You need to implement the logic to check if plane1 and plane2 will collide within the time constraint
     // Return true if they will collide, false otherwise
-    // A simple approach is to just check if their positions will be within the defined constraints (e.g., CONSTRAINT_X, CONSTRAINT_Y, CONSTRAINT_Z)
-    // A more accurate approach would involve calculating their future positions based on their velocities
-    // and checking if those future positions will be within the defined constraints within the time constraint
-	// COEN320 Task 3.4
-	    // A collision is defined as two planes entering the defined airspace constraints within the time constraint
+    
+    // **FIX: Check both current AND future positions properly**
+    
+    // Calculate the distance between the two planes in each axis (current position)
+    double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
+    double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
+    double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
 
-	    // Calculate the distance between the two planes in each axis
-	    double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
-	    double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
-	    double deltaZ = std::abs(plane1.PositionZ - plane2.PositionZ);
+    // Check if the planes are currently within the constraint distances
+    if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
+        // Planes are too close right now - collision detected
+        return true;
+    }
 
-	    // Check if the planes are within the constraint distances
-	    if (deltaX < CONSTRAINT_X && deltaY < CONSTRAINT_Y && deltaZ < CONSTRAINT_Z) {
-	        // Planes are too close - collision detected
+    // Predict positions after time constraint
+    double futureX1 = plane1.PositionX + plane1.VelocityX * timeConstraintCollisionFreq;
+    double futureY1 = plane1.PositionY + plane1.VelocityY * timeConstraintCollisionFreq;
+    double futureZ1 = plane1.PositionZ + plane1.VelocityZ * timeConstraintCollisionFreq;
 
-    return true;
-	    }
+    double futureX2 = plane2.PositionX + plane2.VelocityX * timeConstraintCollisionFreq;
+    double futureY2 = plane2.PositionY + plane2.VelocityY * timeConstraintCollisionFreq;
+    double futureZ2 = plane2.PositionZ + plane2.VelocityZ * timeConstraintCollisionFreq;
 
+    // Check if future positions will be within constraints
+    double futureDeltaX = std::abs(futureX1 - futureX2);
+    double futureDeltaY = std::abs(futureY1 - futureY2);
+    double futureDeltaZ = std::abs(futureZ1 - futureZ2);
 
-//fix to make work with relative position
+    if (futureDeltaX < CONSTRAINT_X && futureDeltaY < CONSTRAINT_Y && futureDeltaZ < CONSTRAINT_Z) {
+        // Planes will be too close in the future - collision predicted
+        return true;
+    }
 
-	        // Predict positions after time constraint
-	        double futureX1 = plane1.PositionX + plane1.VelocityX * timeConstraintCollisionFreq;
-	        double futureY1 = plane1.PositionY + plane1.VelocityY * timeConstraintCollisionFreq;
-	        double futureZ1 = plane1.PositionZ + plane1.VelocityZ * timeConstraintCollisionFreq;
-
-	        double futureX2 = plane2.PositionX + plane2.VelocityX * timeConstraintCollisionFreq;
-	        double futureY2 = plane2.PositionY + plane2.VelocityY * timeConstraintCollisionFreq;
-	        double futureZ2 = plane2.PositionZ + plane2.VelocityZ * timeConstraintCollisionFreq;
-
-	        // Check if future positions will be within constraints
-	        double futureDeltaX = std::abs(futureX1 - futureX2);
-	        double futureDeltaY = std::abs(futureY1 - futureY2);
-	        double futureDeltaZ = std::abs(futureZ1 - futureZ2);
-
-	        if (futureDeltaX < CONSTRAINT_X && futureDeltaY < CONSTRAINT_Y && futureDeltaZ < CONSTRAINT_Z) {
-	            return true;
-	        }
-
-	        return false;
+    // No collision detected
+    return false;
 }
 
 
@@ -249,4 +236,5 @@ void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
 	if (status == -1) {
 		perror("Computer system: Error occurred while sending message to display channel");
 	}
+	name_close(display_channel);
 }
