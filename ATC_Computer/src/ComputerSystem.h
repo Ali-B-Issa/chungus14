@@ -15,7 +15,7 @@ const double CONSTRAINT_X = 3000;
 const double CONSTRAINT_Y = 3000;
 const double CONSTRAINT_Z = 1000;
 
-#include "Msg_structs.h"  // Include the structure definition for msg_plane_info
+#include "Msg_structs.h"
 
 class ComputerSystem {
 public:
@@ -43,6 +43,8 @@ private:
 
     int timeConstraintCollisionFreq = 180;
 
+
+
     int shm_fd;
     SharedMemory* shared_mem;
     std::thread monitorThread;
@@ -50,9 +52,6 @@ private:
     std::atomic<bool> running;
 
     bool listen = true;
-    
-    // Keep display channel open for the lifetime of the object
-    int display_channel;
 };
 
 #endif // COMPUTER_SYSTEM_H
