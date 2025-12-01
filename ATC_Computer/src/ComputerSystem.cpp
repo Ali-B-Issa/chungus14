@@ -21,14 +21,6 @@ ComputerSystem::~ComputerSystem() {
 bool ComputerSystem::initializeSharedMemory() {
 	// Open the shared memory object
 	while (true) {
-        // COEN320 Task 3.2
-		// Attempt to open the shared memory object (You need to use the same name as Task 2 in Radar)
-        // In case of error, retry until successful
-        // e.g. shm_open("/radar_shared_mem", O_RDONLY, 0666);
-        // COEN320 Task 3.3
-		// Map the shared memory object into the process's address space
-        // The shared memory should be mapped to "shared_mem" (check for errors)
-
 		 // COEN320 Task 3.2
 		// Attempt to open the shared memory object (You need to use the same name as Task 2 in Radar)
 		shm_fd = shm_open("/tmp/AH_40247851_40228573_Radar_shm", O_RDONLY, 0666);
@@ -126,40 +118,29 @@ void ComputerSystem::monitorAirspace() {
 }
 
 void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_info> planes) {
-   // std::cout << "Checking for collisions at time: " << currentTime << std::endl;
     // COEN320 Task 3.4
     // detect collisions between planes in the airspace within the time constraint
-    // You need to Iterate through each pair of planes and in case of collision,
-    // store the pair of plane IDs that are predicted to collide
-    // You can use the function checkAxes provided below to check if two planes will collide
-    // COEN320 Task 3.5
-    // in case of collision, send message to Display system
 
     std::vector<std::pair<int, int>> collisionPairs;
 
-    // **FIX: Check ALL pairs of planes, not just adjacent ones**
+    // Check ALL pairs of planes
     for (size_t i = 0; i < planes.size(); i++) {
     	for (size_t j = i + 1; j < planes.size(); j++) {
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
-    			// Only add unique pairs
-    			bool isDuplicate = false;
-    			for (const auto& pair : collisionPairs) {
-    				if ((pair.first == planes[i].id && pair.second == planes[j].id) ||
-    					(pair.first == planes[j].id && pair.second == planes[i].id)) {
-    					isDuplicate = true;
-    					break;
-    				}
-    			}
+    			collisionPairs.emplace_back(planes[i].id, planes[j].id);
     			
-    			if (!isDuplicate) {
-    				collisionPairs.emplace_back(planes[i].id, planes[j].id);
-    				// Debug output to see which collisions are detected
-    				//std::cout << "*** Collision detected between Plane " << planes[i].id 
-    				//          << " and Plane " << planes[j].id << " ***\n";
-    			}
+    			// Debug output - ENABLE THIS to see what ComputerSystem detects
+    			std::cout << "*** ComputerSystem detected collision: Plane " 
+    			          << planes[i].id << " ⟷ Plane " << planes[j].id << " ***\n";
     		}
     	}
+    }
+
+    // Debug output - show total pairs detected
+    if (!collisionPairs.empty()) {
+        std::cout << "ComputerSystem: Total collision pairs detected: " 
+                  << collisionPairs.size() << "\n";
     }
 
     // COEN320 Task 3.5
@@ -175,6 +156,9 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	msg_to_send.planeID = -1;
     	msg_to_send.type = MessageType::COLLISION_DETECTED;
     	msg_to_send.dataSize = dataSize;
+    	
+    	// Verify we're copying all pairs
+    	std::cout << "ComputerSystem: Sending " << numPairs << " collision pairs to Display\n";
     	std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
 
     	sendCollisionToDisplay(msg_to_send);
@@ -185,10 +169,6 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
 bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     // COEN320 Task 3.4
     // A collision is defined as two planes entering the defined airspace constraints within the time constraint
-    // You need to implement the logic to check if plane1 and plane2 will collide within the time constraint
-    // Return true if they will collide, false otherwise
-    
-    // **FIX: Check both current AND future positions properly**
     
     // Calculate the distance between the two planes in each axis (current position)
     double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
@@ -228,13 +208,16 @@ bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
 void ComputerSystem::sendCollisionToDisplay(const Message_inter_process& msg){
 	int display_channel = name_open(display_channel_name, 0);
 	if (display_channel == -1) {
-		throw std::runtime_error("Computer system: Error occurred while attaching to display");
+		std::cerr << "Computer system: Error opening display channel: " << strerror(errno) << "\n";
+		return;
 	}
 	int reply;
 
 	int status = MsgSend(display_channel, &msg, sizeof(msg), &reply, sizeof(reply));
 	if (status == -1) {
-		perror("Computer system: Error occurred while sending message to display channel");
+		std::cerr << "Computer system: Error sending to display: " << strerror(errno) << "\n";
+	} else {
+		std::cout << "ComputerSystem: Successfully sent collision message to Display\n";
 	}
 	name_close(display_channel);
 }
