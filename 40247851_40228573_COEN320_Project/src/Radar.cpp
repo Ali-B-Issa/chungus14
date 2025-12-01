@@ -50,7 +50,6 @@ void Radar::ListenAirspaceArrivalAndDeparture() {
 	}
 	// Simulated listening for aircraft arrivals and departures
     while (!stopThreads.load()) {
-        // Replace with IPC
         Message msg;
         int rcvid = MsgReceive(Radar_channel->chid, &msg, sizeof(msg), nullptr); // Replace with actual channel ID
         if (rcvid == -1) {
@@ -204,7 +203,7 @@ void Radar::writeToSharedMemory() {//done
     shared_mem->timestamp = tick_counter_ref;
 
 	*/
-	// Open or create shared memory object
+	// Open shared memory object
 	    shm_fd = shm_open("/tmp/AH_40247851_40228573_Radar_shm", O_CREAT | O_RDWR, 0666);
 	    if (shm_fd == -1) {
 	        std::cerr << "Failed to open shared memory" << std::endl;
@@ -309,7 +308,7 @@ void Radar::clearSharedMemory() { //done
 	    // Set start flag to false
 	    sharedMemPtr->start = false;
 
-	    // Unmap the shared memory and close the file descriptor
+	    // Unmap the shared memory and close the file
 	    munmap(sharedMemPtr, SHARED_MEMORY_SIZE);
 	    close(shm_fd);
 }
