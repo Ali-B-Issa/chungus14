@@ -10,11 +10,11 @@
 #include <chrono>
 #include <thread>
 
-// COEN320 Task 4: Send to Communications System, not Computer System
+
 #define COMMS_CHANNEL_NAME "AH_40247851_40228573_Comms"
 
 OperatorConsole::OperatorConsole() : exit(false) {
-    // Start the console input handling thread
+
     Operator_Console = std::thread(&OperatorConsole::HandleConsoleInputs, this);
 }
 
@@ -26,13 +26,13 @@ OperatorConsole::~OperatorConsole() {
 }
 
 void OperatorConsole::HandleConsoleInputs() {
-    std::cout << "\n=== Operator Console Started ===\n";
+    std::cout << "\n Operator Console Started\n";
     std::cout << "Available commands:\n";
     std::cout << "  1. heading <planeID> <velX> <velY> <velZ> - Change plane heading\n";
     std::cout << "  2. position <planeID> <x> <y> <z> - Change plane position\n";
     std::cout << "  3. altitude <planeID> <z> - Change plane altitude\n";
-    std::cout << "  4. exit - Exit the console\n";
-    std::cout << "================================\n\n";
+    std::cout << "  4. exit - Exit the console\n\n\n";
+
 
     while (!exit) {
         std::cout << "Enter command: ";
@@ -48,7 +48,7 @@ void OperatorConsole::HandleConsoleInputs() {
         iss >> command;
 
         if (command == "exit") {
-            std::cout << "Exiting Operator Console...\n";
+            std::cout << "Exiting Operator Console\n";
             exit = true;
             break;
         }
@@ -57,7 +57,7 @@ void OperatorConsole::HandleConsoleInputs() {
             double velX, velY, velZ;
 
             if (iss >> planeID >> velX >> velY >> velZ) {
-                // Open channel to Communications System (not Computer System)
+                // Open channel to Communications System
                 int comms_channel = name_open(COMMS_CHANNEL_NAME, 0);
 
                 if (comms_channel == -1) {
@@ -66,16 +66,16 @@ void OperatorConsole::HandleConsoleInputs() {
                     continue;
                 }
 
-                // Create and INITIALIZE message for heading change
+                // Create and intitialize message for heading change
                 Message_inter_process msg;
-                memset(&msg, 0, sizeof(msg));  // Zero out entire structure
+                memset(&msg, 0, sizeof(msg));  // Zero out entire structure so everything would be intitialized to 0
 
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_OF_HEADING;
                 msg.planeID = planeID;
 
                 msg_change_heading heading_data;
-                memset(&heading_data, 0, sizeof(heading_data));  // Zero out data structure
+                memset(&heading_data, 0, sizeof(heading_data));
                 heading_data.ID = planeID;
                 heading_data.VelocityX = velX;
                 heading_data.VelocityY = velY;
@@ -83,7 +83,7 @@ void OperatorConsole::HandleConsoleInputs() {
                 heading_data.altitude = 0;
 
                 msg.dataSize = sizeof(msg_change_heading);
-                std::memcpy(msg.data.data(), &heading_data, sizeof(msg_change_heading));
+                std::memcpy(msg.data.data(), &heading_data, sizeof(msg_change_heading)); // copy from src to dst to prepare it to be sent
 
                 int reply;
                 if (MsgSend(comms_channel, &msg, sizeof(msg), &reply, sizeof(reply)) == -1) {
@@ -95,7 +95,7 @@ void OperatorConsole::HandleConsoleInputs() {
 
                 name_close(comms_channel);
 
-                // Small delay to allow system to process
+
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 std::cerr << "Invalid heading command format. Usage: heading <planeID> <velX> <velY> <velZ>\n";
@@ -115,16 +115,16 @@ void OperatorConsole::HandleConsoleInputs() {
                     continue;
                 }
 
-                // Create and INITIALIZE message for position change
+
                 Message_inter_process msg;
-                memset(&msg, 0, sizeof(msg));  // Zero out entire structure
+                memset(&msg, 0, sizeof(msg));
 
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_POSITION;
                 msg.planeID = planeID;
 
                 msg_change_position pos_data;
-                memset(&pos_data, 0, sizeof(pos_data));  // Zero out data structure
+                memset(&pos_data, 0, sizeof(pos_data));
                 pos_data.x = x;
                 pos_data.y = y;
                 pos_data.z = z;
@@ -142,7 +142,7 @@ void OperatorConsole::HandleConsoleInputs() {
 
                 name_close(comms_channel);
 
-                // Small delay to allow system to process
+
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 std::cerr << "Invalid position command format. Usage: position <planeID> <x> <y> <z>\n";
@@ -162,16 +162,16 @@ void OperatorConsole::HandleConsoleInputs() {
                     continue;
                 }
 
-                // Create and INITIALIZE message for altitude change
+
                 Message_inter_process msg;
-                memset(&msg, 0, sizeof(msg));  // Zero out entire structure
+                memset(&msg, 0, sizeof(msg));
 
                 msg.header = true;  // Inter-process
                 msg.type = MessageType::REQUEST_CHANGE_ALTITUDE;
                 msg.planeID = planeID;
 
                 msg_change_heading altitude_data;
-                memset(&altitude_data, 0, sizeof(altitude_data));  // Zero out data structure
+                memset(&altitude_data, 0, sizeof(altitude_data));
                 altitude_data.ID = planeID;
                 altitude_data.altitude = z;
                 altitude_data.VelocityX = 0;
@@ -191,7 +191,7 @@ void OperatorConsole::HandleConsoleInputs() {
 
                 name_close(comms_channel);
 
-                // Small delay to allow system to process
+
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 std::cerr << "Invalid altitude command format. Usage: altitude <planeID> <z>\n";
@@ -205,5 +205,5 @@ void OperatorConsole::HandleConsoleInputs() {
 }
 
 void OperatorConsole::logCommand(const std::string& command) {
-    std::cout << "[LOG] Command received: " << command << std::endl;
+    std::cout << "Command received: " << command << std::endl;
 }
