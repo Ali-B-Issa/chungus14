@@ -138,12 +138,12 @@ void Display::listenForCollisions() {
             std::pair<int, int>* pairs = reinterpret_cast<std::pair<int, int>*>(msg.data.data());
 
             std::lock_guard<std::mutex> lock(collisionMutex);
-            
+
             // **FIX: REPLACE collision data, don't accumulate**
             // Each message from ComputerSystem contains the COMPLETE current state
             planesInCollision.clear();
             collisionPairs.clear();
-            
+
             // Update collision time
             lastCollisionTime = shared_mem->timestamp;
 
@@ -152,12 +152,12 @@ void Display::listenForCollisions() {
                 planesInCollision.insert(pairs[i].first);
                 planesInCollision.insert(pairs[i].second);
                 collisionPairs.push_back(pairs[i]);
-                
+
                 // Debug output
-                //std::cout << "Display received collision: Plane " << pairs[i].first 
+                //std::cout << "Display received collision: Plane " << pairs[i].first
                 //          << " ⟷ Plane " << pairs[i].second << "\n";
             }
-            
+
             //std::cout << "Display: Total collision pairs stored: " << collisionPairs.size() << "\n";
         }
     }
@@ -202,21 +202,21 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     // **FIX: TRUST ComputerSystem's collision data**
     // Only remove collision pairs where planes have LEFT the airspace
     // Do NOT re-verify distances (causes timing issues)
-    
+
     std::set<int> activePlaneIDs;
     for (const auto& plane : planes) {
         activePlaneIDs.insert(plane.id);
     }
-    
+
     // Remove collision pairs involving planes that have left
     std::vector<std::pair<int, int>> validCollisionPairs;
     std::set<int> validPlanesInCollision;
-    
+
     for (const auto& pair : collisionPairs) {
         // Check if both planes are still in airspace
         bool plane1Active = activePlaneIDs.find(pair.first) != activePlaneIDs.end();
         bool plane2Active = activePlaneIDs.find(pair.second) != activePlaneIDs.end();
-        
+
         if (plane1Active && plane2Active) {
             // Both planes still in airspace - keep this collision pair
             validCollisionPairs.push_back(pair);
@@ -224,22 +224,22 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
             validPlanesInCollision.insert(pair.second);
         }
     }
-    
+
     // Update collision lists
     collisionPairs = validCollisionPairs;
     planesInCollision = validPlanesInCollision;
 
     // Print collision warning header if there are active collisions
     if (!collisionPairs.empty()) {
-        std::cout << "\n╔══════════════════════════════════════════════════════════════╗\n";
-        std::cout << "║          ⚠️  ACTIVE COLLISION WARNINGS ⚠️                    ║\n";
-        std::cout << "╠══════════════════════════════════════════════════════════════╣\n";
+
+        std::cout << "ACTIVE COLLISION WARNINGS:\n";
+
         for (const auto& pair : collisionPairs) {
-            std::cout << "║  Aircraft " << std::setw(2) << pair.first 
-                      << " ⟷  Aircraft " << std::setw(2) << pair.second 
-                      << "  (PROXIMITY ALERT)                 ║\n";
+            std::cout << " Aircraft " << std::setw(2) << pair.first
+                      << " Aircraft " << std::setw(2) << pair.second
+                      << "\n";
         }
-        std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
+
     }
 
     // Print aircraft details
@@ -270,7 +270,7 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
                   << std::setw(4) << (int)plane.VelocityZ << ")";
 
         if (inCollision && !collisionPartners.empty()) {
-            std::cout << " ⚠️  COLLISION WITH: Plane";
+            std::cout << " COLLISION WITH: Plane";
             for (size_t i = 0; i < collisionPartners.size(); i++) {
                 if (i > 0) std::cout << ",";
                 std::cout << " " << collisionPartners[i];
