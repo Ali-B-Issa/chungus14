@@ -129,18 +129,18 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     		// Check if planes will collide
     		if (checkAxes(planes[i], planes[j])) {
     			collisionPairs.emplace_back(planes[i].id, planes[j].id);
-    			
-    			// Debug output - ENABLE THIS to see what ComputerSystem detects
-    			std::cout << "*** ComputerSystem detected collision: Plane " 
-    			          << planes[i].id << " ⟷ Plane " << planes[j].id << " ***\n";
+
+    			// Debug output
+    			//std::cout << " ComputerSystem detected collision: Plane "
+    			     //     << planes[i].id << " ⟷ Plane " << planes[j].id << "\n";
     		}
     	}
     }
 
     // Debug output - show total pairs detected
     if (!collisionPairs.empty()) {
-        std::cout << "ComputerSystem: Total collision pairs detected: " 
-                  << collisionPairs.size() << "\n";
+       //std::cout << "ComputerSystem: Total collision pairs detected: "
+                 // << collisionPairs.size() << "\n";
     }
 
     // COEN320 Task 3.5
@@ -156,9 +156,9 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
     	msg_to_send.planeID = -1;
     	msg_to_send.type = MessageType::COLLISION_DETECTED;
     	msg_to_send.dataSize = dataSize;
-    	
+
     	// Verify we're copying all pairs
-    	std::cout << "ComputerSystem: Sending " << numPairs << " collision pairs to Display\n";
+    	//std::cout << "ComputerSystem: Sending " << numPairs << " collision pairs to Display\n";
     	std::memcpy(msg_to_send.data.data(), collisionPairs.data(), dataSize);
 
     	sendCollisionToDisplay(msg_to_send);
@@ -169,7 +169,7 @@ void ComputerSystem::checkCollision(uint64_t currentTime, std::vector<msg_plane_
 bool ComputerSystem::checkAxes(msg_plane_info plane1, msg_plane_info plane2) {
     // COEN320 Task 3.4
     // A collision is defined as two planes entering the defined airspace constraints within the time constraint
-    
+
     // Calculate the distance between the two planes in each axis (current position)
     double deltaX = std::abs(plane1.PositionX - plane2.PositionX);
     double deltaY = std::abs(plane1.PositionY - plane2.PositionY);
