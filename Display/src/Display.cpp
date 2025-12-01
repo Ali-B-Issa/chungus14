@@ -199,10 +199,6 @@ void Display::displayAircraft() {
 void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
     std::lock_guard<std::mutex> lock(collisionMutex);
 
-    // **FIX: TRUST ComputerSystem's collision data**
-    // Only remove collision pairs where planes have LEFT the airspace
-    // Do NOT re-verify distances (causes timing issues)
-
     std::set<int> activePlaneIDs;
     for (const auto& plane : planes) {
         activePlaneIDs.insert(plane.id);
@@ -224,12 +220,10 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
             validPlanesInCollision.insert(pair.second);
         }
     }
-
-    // Update collision lists
+    
     collisionPairs = validCollisionPairs;
     planesInCollision = validPlanesInCollision;
 
-    // Print collision warning header if there are active collisions
     if (!collisionPairs.empty()) {
 
         std::cout << "ACTIVE COLLISION WARNINGS:\n";
@@ -242,14 +236,12 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
 
     }
 
-    // Print aircraft details
     std::cout << "\n Aircraft Details:\n";
     std::cout << "-------------------------------------------------------------------------\n";
 
     for (const auto& plane : planes) {
         bool inCollision = planesInCollision.find(plane.id) != planesInCollision.end();
 
-        // Find ALL collision partners for this plane
         std::vector<int> collisionPartners;
         if (inCollision) {
             for (const auto& pair : collisionPairs) {
@@ -281,3 +273,4 @@ void Display::printAirspaceGrid(const std::vector<msg_plane_info>& planes) {
 
     std::cout << "\n";
 }
+
