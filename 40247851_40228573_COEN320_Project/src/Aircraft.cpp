@@ -163,8 +163,7 @@ int Aircraft::updatePosition() {
             	Message_inter_process* receivedMsg = reinterpret_cast<Message_inter_process*>(buffer);
 
             	// Debug
-            	std::cout << "Aircraft " << id << " received inter-process message, type: "
-            	          << static_cast<int>(receivedMsg->type) << "\n";
+            	std::cout << "Aircraft " << id << " received inter-process message, type: "<< static_cast<int>(receivedMsg->type) << "\n";
 
             	// COEN320 Lab 4_5: Handle different message types from Communications System
                 switch (receivedMsg->type) {
@@ -216,7 +215,7 @@ int Aircraft::updatePosition() {
                         MsgReply(rcvid, 0, NULL, 0);
                         break;
                     }
-                    // if this is printed out its usually because communications system channel didn't send properly,
+                    // if this is printed out its usually because communications system channel didn't send properly
                     default:
                         std::cerr << "Aircraft " << id << " received unknown inter-process message type: " << static_cast<int>(receivedMsg->type) << "\n";
                         MsgReply(rcvid, -1, NULL, 0);
